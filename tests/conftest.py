@@ -4,6 +4,7 @@ import os
 import mysql.connector
 from mysql.connector import Error
 
+
 @pytest.fixture(scope="session")
 def mysql_connection():
     """Create a test database connection."""
@@ -12,9 +13,9 @@ def mysql_connection():
             host=os.getenv("MYSQL_HOST", "127.0.0.1"),
             user=os.getenv("MYSQL_USER", "root"),
             password=os.getenv("MYSQL_PASSWORD", "testpassword"),
-            database=os.getenv("MYSQL_DATABASE", "test_db")
+            database=os.getenv("MYSQL_DATABASE", "test_db"),
         )
-        
+
         if connection.is_connected():
             # Create a test table
             cursor = connection.cursor()
@@ -26,17 +27,18 @@ def mysql_connection():
                 )
             """)
             connection.commit()
-            
+
             yield connection
-            
+
             # Cleanup
             cursor.execute("DROP TABLE IF EXISTS test_table")
             connection.commit()
             cursor.close()
             connection.close()
-            
+
     except Error as e:
         pytest.fail(f"Failed to connect to MySQL: {e}")
+
 
 @pytest.fixture(scope="session")
 def mysql_cursor(mysql_connection):

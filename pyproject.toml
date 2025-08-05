@@ -1,5 +1,5 @@
 [project]
-name = "mysql_mcp_server"
+name = "mysql_mcp_server_pro_plus"
 version = "0.2.2"
 description = "A Model Context Protocol (MCP) server that enables secure interaction with MySQL databases. This server allows AI assistants to list tables, read data, and execute SQL queries through a controlled interface, making database exploration and analysis safer and more structured."
 readme = "README.md"
@@ -7,6 +7,8 @@ requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.0.0",
     "mysql-connector-python>=9.1.0",
+    "pre-commit>=4.2.0",
+    "pyrefly>=0.27.0",
 ]
 [[project.authors]]
 name = "Dana K. Williams"
@@ -16,5 +18,12 @@ email = "dana_w@designcomputer.com"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "pytest-cov>=6.2.1",
+]
+
 [project.scripts]
-mysql_mcp_server = "mysql_mcp_server:main"
+mysql_mcp_server = "mysql_mcp_server_pro_plus:main"

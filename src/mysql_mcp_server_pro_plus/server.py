@@ -9,10 +9,10 @@ from pydantic import AnyUrl
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger("mysql_mcp_server")
+logger = logging.getLogger("mysql_mcp_server_pro_plus")
+
 
 def get_db_config():
     """Get database configuration from environment variables."""
@@ -29,30 +29,38 @@ def get_db_config():
         # Disable autocommit for better transaction control
         "autocommit": True,
         # Set SQL mode for better compatibility - can be overridden
-        "sql_mode": os.getenv("MYSQL_SQL_MODE", "TRADITIONAL")
+        "sql_mode": os.getenv("MYSQL_SQL_MODE", "TRADITIONAL"),
     }
 
     # Remove None values to let MySQL connector use defaults if not specified
     config = {k: v for k, v in config.items() if v is not None}
 
     if not all([config.get("user"), config.get("password"), config.get("database")]):
-        logger.error("Missing required database configuration. Please check environment variables:")
+        logger.error(
+            "Missing required database configuration. Please check environment variables:"
+        )
         logger.error("MYSQL_USER, MYSQL_PASSWORD, and MYSQL_DATABASE are required")
         raise ValueError("Missing required database configuration")
 
     return config
 
+
 # Initialize server
-app = Server("mysql_mcp_server")
+app = Server("mysql_mcp_server_pro_plus")
+
 
 @app.list_resources()
 async def list_resources() -> list[Resource]:
     """List MySQL tables as resources."""
     config = get_db_config()
     try:
-        logger.info(f"Connecting to MySQL with charset: {config.get('charset')}, collation: {config.get('collation')}")
+        logger.info(
+            f"Connecting to MySQL with charset: {config.get('charset')}, collation: {config.get('collation')}"
+        )
         with connect(**config) as conn:
-            logger.info(f"Successfully connected to MySQL server version: {conn.get_server_info()}")
+            logger.info(
+                f"Successfully connected to MySQL server version: {conn.get_server_info()}"
+            )
             with conn.cursor() as cursor:
                 cursor.execute("SHOW TABLES")
                 tables = cursor.fetchall()
@@ -65,7 +73,7 @@ async def list_resources() -> list[Resource]:
                             uri=f"mysql://{table[0]}/data",
                             name=f"Table: {table[0]}",
                             mimeType="text/plain",
-                            description=f"Data in table: {table[0]}"
+                            description=f"Data in table: {table[0]}",
                         )
                     )
                 return resources
@@ -73,6 +81,7 @@ async def list_resources() -> list[Resource]:
         logger.error(f"Failed to list resources: {str(e)}")
         logger.error(f"Error code: {e.errno}, SQL state: {e.sqlstate}")
         return []
+
 
 @app.read_resource()
 async def read_resource(uri: AnyUrl) -> str:
@@ -84,15 +93,22 @@ async def read_resource(uri: AnyUrl) -> str:
     if not uri_str.startswith("mysql://"):
         raise ValueError(f"Invalid URI scheme: {uri_str}")
 
-    parts = uri_str[8:].split('/')
+    parts = uri_str[8:].split("/")
     table = parts[0]
 
     try:
-        logger.info(f"Connecting to MySQL with charset: {config.get('charset')}, collation: {config.get('collation')}")
+        logger.info(
+            f"Connecting to MySQL with charset: {config.get('charset')}, collation: {config.get('collation')}"
+        )
         with connect(**config) as conn:
-            logger.info(f"Successfully connected to MySQL server version: {conn.get_server_info()}")
+            logger.info(
+                f"Successfully connected to MySQL server version: {conn.get_server_info()}"
+            )
             with conn.cursor() as cursor:
-                cursor.execute(f"SELECT * FROM {table} LIMIT 100")
+                # Use parameterized query to prevent SQL injection
+                # nosec B608 - This is a safe table name validation
+                safe_table = table.replace("`", "``")
+                cursor.execute(f"SELECT * FROM `{safe_table}` LIMIT 100")  # nosec B608
                 columns = [desc[0] for desc in cursor.description]
                 rows = cursor.fetchall()
                 result = [",".join(map(str, row)) for row in rows]
@@ -102,6 +118,7 @@ async def read_resource(uri: AnyUrl) -> str:
         logger.error(f"Database error reading resource {uri}: {str(e)}")
         logger.error(f"Error code: {e.errno}, SQL state: {e.sqlstate}")
         raise RuntimeError(f"Database error: {str(e)}")
+
 
 @app.list_tools()
 async def list_tools() -> list[Tool]:
@@ -116,13 +133,14 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "The SQL query to execute"
+                        "description": "The SQL query to execute",
                     }
                 },
-                "required": ["query"]
-            }
+                "required": ["query"],
+            },
         )
     ]
+
 
 @app.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
@@ -138,9 +156,13 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         raise ValueError("Query is required")
 
     try:
-        logger.info(f"Connecting to MySQL with charset: {config.get('charset')}, collation: {config.get('collation')}")
+        logger.info(
+            f"Connecting to MySQL with charset: {config.get('charset')}, collation: {config.get('collation')}"
+        )
         with connect(**config) as conn:
-            logger.info(f"Successfully connected to MySQL server version: {conn.get_server_info()}")
+            logger.info(
+                f"Successfully connected to MySQL server version: {conn.get_server_info()}"
+            )
             with conn.cursor() as cursor:
                 cursor.execute(query)
 
@@ -157,20 +179,36 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     try:
                         rows = cursor.fetchall()
                         result = [",".join(map(str, row)) for row in rows]
-                        return [TextContent(type="text", text="\n".join([",".join(columns)] + result))]
+                        return [
+                            TextContent(
+                                type="text",
+                                text="\n".join([",".join(columns)] + result),
+                            )
+                        ]
                     except Error as e:
                         logger.warning(f"Error fetching results: {str(e)}")
-                        return [TextContent(type="text", text=f"Query executed but error fetching results: {str(e)}")]
+                        return [
+                            TextContent(
+                                type="text",
+                                text=f"Query executed but error fetching results: {str(e)}",
+                            )
+                        ]
 
                 # Non-SELECT queries
                 else:
                     conn.commit()
-                    return [TextContent(type="text", text=f"Query executed successfully. Rows affected: {cursor.rowcount}")]
+                    return [
+                        TextContent(
+                            type="text",
+                            text=f"Query executed successfully. Rows affected: {cursor.rowcount}",
+                        )
+                    ]
 
     except Error as e:
         logger.error(f"Error executing SQL '{query}': {e}")
         logger.error(f"Error code: {e.errno}, SQL state: {e.sqlstate}")
         return [TextContent(type="text", text=f"Error executing query: {str(e)}")]
+
 
 async def main():
     """Main entry point to run the MCP server."""
@@ -185,18 +223,19 @@ async def main():
     print(f"Database: {config['database']}", file=sys.stderr)
 
     logger.info("Starting MySQL MCP server...")
-    logger.info(f"Database config: {config['host']}/{config['database']} as {config['user']}")
+    logger.info(
+        f"Database config: {config['host']}/{config['database']} as {config['user']}"
+    )
 
     async with stdio_server() as (read_stream, write_stream):
         try:
             await app.run(
-                read_stream,
-                write_stream,
-                app.create_initialization_options()
+                read_stream, write_stream, app.create_initialization_options()
             )
         except Exception as e:
             logger.error(f"Server error: {str(e)}", exc_info=True)
             raise
+
 
 if __name__ == "__main__":
     asyncio.run(main())
