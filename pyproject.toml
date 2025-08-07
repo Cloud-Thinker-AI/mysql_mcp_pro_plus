@@ -1,6 +1,6 @@
 [project]
 name = "mysql_mcp_server_pro_plus"
-version = "0.2.2"
+version = "0.2.4"
 description = "A Model Context Protocol (MCP) server that enables secure interaction with MySQL databases. This server allows AI assistants to list tables, read data, and execute SQL queries through a controlled interface, making database exploration and analysis safer and more structured."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -31,4 +31,4 @@ dev-dependencies = [
 ]
 
 [project.scripts]
-mysql_mcp_server = "mysql_mcp_server_pro_plus:main"
+mysql_mcp_server_pro_plus = "mysql_mcp_server_pro_plus:main"

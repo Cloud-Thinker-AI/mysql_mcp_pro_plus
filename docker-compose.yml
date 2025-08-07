@@ -43,7 +43,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    container_name: mysql_mcp_server
+    container_name: mysql_mcp_server_pro_plus
     restart: unless-stopped
     environment:
       MYSQL_HOST: mysql

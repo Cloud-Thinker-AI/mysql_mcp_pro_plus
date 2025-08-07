@@ -63,6 +63,41 @@ check:
 	uv run twine check dist/*
 	@echo "✅ Check complete"
 
+# Full publish workflow
+publish: clean build check upload
+	@echo "🎉 Package successfully published to PyPI!"
+
+# Full test publish workflow
+publish-test: clean build check upload-test
+	@echo "🎉 Package successfully published to TestPyPI!"
+
+# Show current version
+version:
+	@echo "📋 Current version:"
+	@grep "^version" pyproject.toml | cut -d'"' -f2
+
+# Version bumping functions
+bump-patch:
+	@echo "📈 Bumping patch version..."
+	@current=$$(grep "^version" pyproject.toml | cut -d'"' -f2); \
+	new=$$(echo $$current | awk -F. '{$$3=$$3+1; print $$1"."$$2"."$$3}'); \
+	sed -i.bak "s/version = \"$$current\"/version = \"$$new\"/" pyproject.toml && rm pyproject.toml.bak; \
+	echo "Version bumped: $$current -> $$new"
+
+bump-minor:
+	@echo "📈 Bumping minor version..."
+	@current=$$(grep "^version" pyproject.toml | cut -d'"' -f2); \
+	new=$$(echo $$current | awk -F. '{$$2=$$2+1; $$3=0; print $$1"."$$2"."$$3}'); \
+	sed -i.bak "s/version = \"$$current\"/version = \"$$new\"/" pyproject.toml && rm pyproject.toml.bak; \
+	echo "Version bumped: $$current -> $$new"
+
+bump-major:
+	@echo "📈 Bumping major version..."
+	@current=$$(grep "^version" pyproject.toml | cut -d'"' -f2); \
+	new=$$(echo $$current | awk -F. '{$$1=$$1+1; $$2=0; $$3=0; print $$1"."$$2"."$$3}'); \
+	sed -i.bak "s/version = \"$$current\"/version = \"$$new\"/" pyproject.toml && rm pyproject.toml.bak; \
+	echo "Version bumped: $$current -> $$new"
+
 # Development and testing
 test: ## Run tests
 	@echo "Running tests..."

@@ -70,4 +70,4 @@ RUN --mount=type=cache,target=/tmp/.uv-cache \
     uv sync --frozen
 
 # Command to run the server
-CMD ["mysql_mcp_server"]
+CMD ["mysql_mcp_server_pro_plus"]
