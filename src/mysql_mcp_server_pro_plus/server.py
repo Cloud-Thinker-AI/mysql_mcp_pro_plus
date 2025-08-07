@@ -8,6 +8,7 @@ from .tools import (
     list_tables_tool,
     describe_table_tool,
     get_database_overview_tool,
+    get_blocking_queries_tool,
 )
 
 from .logger import logger
@@ -101,6 +102,32 @@ async def get_database_overview(
     return await get_database_overview_tool(
         _db_manager, _security_validator, max_tables, sampling_mode, timeout
     )
+
+
+@mcp.tool()
+async def get_blocking_queries(timeout: int = 300) -> str:
+    """Analyze MySQL blocking queries and lock contention.
+
+    Enterprise-grade blocking queries analysis featuring:
+    - Modern Detection: Uses MySQL PERFORMANCE_SCHEMA for accurate blocking identification
+    - Lock Hierarchy Visualization: Complete blocking chains and process relationships
+    - Comprehensive Metrics: Process details, wait events, timing, lock types, and affected relations
+    - Intelligent Recommendations: Severity-based suggestions with specific optimization guidance
+    - Production Ready: Designed for enterprise database monitoring and performance troubleshooting
+
+    Analysis Output:
+    - Process Information: Thread ID, user, host, database, and connection details
+    - Query Context: Full query text, execution timing, and resource consumption
+    - Lock Details: Lock types, modes, affected database objects, and wait events
+    - State Analysis: Process states, wait information, and blocking duration
+    - Trend Analysis: Summary statistics and pattern recognition
+    - Categorized Recommendations: 🚨 Critical, ⚠️ Warning, 💡 Optimization, 🎯 Hotspot alerts
+
+    Args:
+        timeout: Maximum execution time in seconds (default: 300)
+    """
+    global _db_manager
+    return await get_blocking_queries_tool(_db_manager, timeout)
 
 
 def main():
