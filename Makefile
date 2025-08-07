@@ -14,6 +14,10 @@ up: ## Start all services in detached mode
 	@echo "Starting services..."
 	docker compose up -d --build
 
+up-mcp:
+	@echo "Starting MCP server..."
+	docker compose up -d mcp-server
+
 down: ## Stop and remove all containers, networks, and volumes
 	@echo "Stopping and removing all services..."
 	docker compose down -v

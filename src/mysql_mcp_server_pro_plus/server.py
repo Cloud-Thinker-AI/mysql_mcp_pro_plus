@@ -3,6 +3,7 @@ from fastmcp import FastMCP
 from .config import DatabaseConfig
 from .db_manager import DatabaseManager
 from .validator import SecurityValidator
+from .tools import execute_sql_tool, list_tables_tool, describe_table_tool
 
 from .logger import logger
 
@@ -51,52 +52,15 @@ async def execute_sql(query: str) -> str:
     Args:
         query: The SQL query to execute
     """
-    try:
-        logger.info(f"Executing SQL query: {query[:100]}...")
-
-        global _db_manager, _security_validator
-        if not _db_manager or not _security_validator:
-            raise RuntimeError("Server not properly initialized")
-
-        # Validate and sanitize query
-        validated_query = _security_validator.validate_query(query)
-
-        # Execute query
-        result = await _db_manager.execute_query(validated_query)
-
-        if result.has_results:
-            # Format results as CSV
-            lines = [",".join(result.columns)]
-            for row in result.rows:
-                lines.append(",".join(str(cell) for cell in row))
-            return "\n".join(lines)
-        else:
-            return f"Query executed successfully. Rows affected: {result.row_count}"
-
-    except Exception as e:
-        logger.error(f"SQL execution error: {e}")
-        return f"Error: {str(e)}"
+    global _db_manager, _security_validator
+    return await execute_sql_tool(query, _db_manager, _security_validator)
 
 
 @mcp.tool()
 async def list_tables() -> str:
     """List all tables in the database."""
-    try:
-        logger.info("Listing database tables")
-
-        global _db_manager
-        if not _db_manager:
-            raise RuntimeError("Database manager not initialized")
-
-        tables = await _db_manager.get_tables()
-        if tables:
-            return "\n".join(tables)
-        else:
-            return "No tables found"
-
-    except Exception as e:
-        logger.error(f"Error listing tables: {e}")
-        return f"Error: {str(e)}"
+    global _db_manager
+    return await list_tables_tool(_db_manager)
 
 
 @mcp.tool()
@@ -106,30 +70,8 @@ async def describe_table(table_name: str) -> str:
     Args:
         table_name: Name of the table to describe
     """
-    try:
-        logger.info(f"Describing table: {table_name}")
-
-        global _db_manager, _security_validator
-        if not _db_manager or not _security_validator:
-            raise RuntimeError("Server not properly initialized")
-
-        if not _security_validator._is_valid_table_name(table_name):
-            raise ValueError(f"Invalid table name: {table_name}")
-
-        query = f"DESCRIBE `{table_name}`"
-        result = await _db_manager.execute_query(query)
-
-        if result.has_results:
-            lines = [",".join(result.columns)]
-            for row in result.rows:
-                lines.append(",".join(str(cell) for cell in row))
-            return "\n".join(lines)
-        else:
-            return "No table structure information available"
-
-    except Exception as e:
-        logger.error(f"Error describing table {table_name}: {e}")
-        return f"Error: {str(e)}"
+    global _db_manager, _security_validator
+    return await describe_table_tool(table_name, _db_manager, _security_validator)
 
 
 def main():
