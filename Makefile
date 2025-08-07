@@ -16,7 +16,7 @@ up: ## Start all services in detached mode
 
 up-mcp:
 	@echo "Starting MCP server..."
-	docker compose up -d mcp-server
+	docker compose up --build mcp-server -d
 
 down: ## Stop and remove all containers, networks, and volumes
 	@echo "Stopping and removing all services..."
@@ -68,11 +68,6 @@ mysql-root: ## Access MySQL as root
 generate-test-data: ## Generate 10M rows and perform 1M transactions for testing
 	@echo "Generating test data..."
 	uv run python scripts/generate_test_data.py
-	@echo "Test data generation completed!"
-
-generate-test-data-docker: ## Generate test data using Docker container
-	@echo "Generating test data using Docker..."
-	docker compose exec mcp-server python scripts/generate_test_data.py
 	@echo "Test data generation completed!"
 
 verify-bad-practices: ## Verify that bad practices are present in the database

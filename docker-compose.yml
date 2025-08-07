@@ -88,6 +88,7 @@ services:
 
   # Optional: MySQL Admin Tool (phpMyAdmin)
   phpmyadmin:
+    platform: linux/amd64
     image: phpmyadmin/phpmyadmin:latest
     container_name: mysql_mcp_phpmyadmin
     restart: unless-stopped

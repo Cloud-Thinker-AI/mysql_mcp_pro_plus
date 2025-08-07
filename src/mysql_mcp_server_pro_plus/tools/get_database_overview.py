@@ -139,8 +139,8 @@ class DatabaseOverviewTool:
             total_size_gb = cast(
                 int, db_info["database_summary"]["total_size_bytes"]
             ) / (1024**3)  # type: ignore
-            db_info["database_summary"]["total_size_readable"] = (  # type: ignore
-                f"{total_size_gb:.2f} GB"
+            db_info["database_summary"]["total_size_readable"] = (
+                f"{total_size_gb:.2f} GB"  # type: ignore
             )
 
             # Add top tables summary
@@ -343,12 +343,21 @@ class DatabaseOverviewTool:
     async def _get_bulk_table_stats(
         self, tables: List[str], schema: str
     ) -> Dict[str, Dict[str, Any]]:
-        """Get table statistics for multiple tables in a single query."""
+        """Get table statistics for multiple tables in a single query (no table scans)."""
         if not tables:
             return {}
 
         try:
-            # MySQL table statistics from information_schema
+            # First, try to update table statistics for better accuracy (non-blocking)
+            # ANALYZE TABLE only updates metadata, doesn't scan data
+            try:
+                for table in tables[:10]:  # Limit to first 10 tables to avoid timeout
+                    analyze_query = f"ANALYZE TABLE `{schema}`.`{table}`"
+                    await self.db_manager.execute_query(analyze_query)
+            except Exception as e:
+                logger.debug(f"Could not update table statistics (non-critical): {e}")
+
+            # MySQL table statistics from information_schema (estimates only, no table scans)
             table_list = "', '".join(tables)
             query = f"""
                 SELECT
@@ -357,7 +366,8 @@ class DatabaseOverviewTool:
                     IFNULL(DATA_LENGTH + INDEX_LENGTH, 0) as size_bytes,
                     IFNULL(DATA_LENGTH, 0) as data_size,
                     IFNULL(INDEX_LENGTH, 0) as index_size,
-                    IFNULL(AUTO_INCREMENT, 0) as auto_increment
+                    IFNULL(AUTO_INCREMENT, 0) as auto_increment,
+                    ENGINE as engine
                 FROM information_schema.TABLES
                 WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME IN ('{table_list}')
             """
@@ -369,17 +379,32 @@ class DatabaseOverviewTool:
                 for row in result.rows:
                     row_dict = dict(zip(result.columns, row))
                     table_name = row_dict["table_name"]
+                    engine = row_dict.get("engine", "").upper()
+
+                    # Note: TABLE_ROWS is an estimate for InnoDB tables
+                    row_count = int(row_dict.get("row_count", 0) or 0)
+
                     stats_result[table_name] = {
-                        "row_count": int(row_dict.get("row_count", 0) or 0),
+                        "row_count": row_count,
                         "size_bytes": int(row_dict.get("size_bytes", 0) or 0),
                         "data_size": int(row_dict.get("data_size", 0) or 0),
                         "index_size": int(row_dict.get("index_size", 0) or 0),
+                        "engine": engine,
+                        "is_estimate": engine
+                        == "INNODB",  # InnoDB row counts are estimates
                     }
 
             # Add empty stats for tables not found
             for table in tables:
                 if table not in stats_result:
-                    stats_result[table] = {"row_count": 0, "size_bytes": 0}
+                    stats_result[table] = {
+                        "row_count": 0,
+                        "size_bytes": 0,
+                        "data_size": 0,
+                        "index_size": 0,
+                        "engine": "UNKNOWN",
+                        "is_estimate": True,
+                    }
 
             return stats_result
 
@@ -439,14 +464,24 @@ class DatabaseOverviewTool:
         return relationships
 
     async def _get_table_stats(self, table: str, schema: str) -> Dict[str, Any]:
-        """Get basic table statistics."""
+        """Get basic table statistics (no table scans)."""
         try:
+            # Try to update table statistics for better accuracy (non-blocking)
+            try:
+                analyze_query = f"ANALYZE TABLE `{schema}`.`{table}`"
+                await self.db_manager.execute_query(analyze_query)
+            except Exception as e:
+                logger.debug(
+                    f"Could not update statistics for {schema}.{table} (non-critical): {e}"
+                )
+
             stats_query = f"""
                 SELECT
                     IFNULL(TABLE_ROWS, 0) as row_count,
                     IFNULL(DATA_LENGTH + INDEX_LENGTH, 0) as size_bytes,
                     IFNULL(DATA_LENGTH, 0) as data_size,
-                    IFNULL(INDEX_LENGTH, 0) as index_size
+                    IFNULL(INDEX_LENGTH, 0) as index_size,
+                    ENGINE as engine
                 FROM information_schema.TABLES
                 WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table}'
             """
@@ -454,14 +489,24 @@ class DatabaseOverviewTool:
             result = await self.db_manager.execute_query(stats_query)
             if result.has_results and result.rows:
                 row_dict = dict(zip(result.columns, result.rows[0]))
+                engine = row_dict.get("engine", "").upper()
                 return {
                     "row_count": int(row_dict.get("row_count", 0) or 0),
                     "size_bytes": int(row_dict.get("size_bytes", 0) or 0),
                     "data_size": int(row_dict.get("data_size", 0) or 0),
                     "index_size": int(row_dict.get("index_size", 0) or 0),
+                    "engine": engine,
+                    "is_estimate": engine == "INNODB",
                 }
             else:
-                return {"row_count": 0, "size_bytes": 0}
+                return {
+                    "row_count": 0,
+                    "size_bytes": 0,
+                    "data_size": 0,
+                    "index_size": 0,
+                    "engine": "UNKNOWN",
+                    "is_estimate": True,
+                }
         except Exception as e:
             logger.warning(f"Could not get stats for {schema}.{table}: {e}")
             return {"error": str(e)}
@@ -839,7 +884,9 @@ class DatabaseOverviewTool:
         output.append(f"Total Schemas: {db_summary.get('total_schemas', 0)}")
         output.append(f"Total Tables: {db_summary.get('total_tables', 0)}")
         output.append(f"Total Size: {db_summary.get('total_size_readable', 'N/A')}")
-        output.append(f"Total Rows: {db_summary.get('total_rows', 0):,}")
+        output.append(
+            f"Total Rows: {db_summary.get('total_rows', 0):,} (estimates for InnoDB)"
+        )
         output.append("")
 
         # Performance Overview
@@ -1037,6 +1084,9 @@ class DatabaseOverviewTool:
         output.append(f"Tables Analyzed: {metadata.get('tables_analyzed', 0)}")
         output.append(f"Tables Skipped: {metadata.get('tables_skipped', 0)}")
         output.append(f"Execution Time: {metadata.get('execution_time', 'N/A')}s")
+        output.append(
+            "Note: Uses ANALYZE TABLE for better estimates, no full table scans"
+        )
         return "\n".join(output)
 
 
