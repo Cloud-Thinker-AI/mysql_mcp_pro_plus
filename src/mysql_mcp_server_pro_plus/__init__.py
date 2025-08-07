@@ -14,4 +14,9 @@ def cli_main():
 
 
 # Expose main function for script entry
-__all__ = ["cli_main", "server"]
+def main():
+    """Main entry point that matches pyproject.toml script configuration."""
+    cli_main()
+
+
+__all__ = ["main", "cli_main", "server"]

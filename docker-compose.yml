@@ -46,14 +46,7 @@ services:
     container_name: mysql_mcp_server_pro_plus
     restart: unless-stopped
     environment:
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
-      MYSQL_USER: ${MYSQL_USER:-mcp_user}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-mcp_password}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-mcp_database}
-      MYSQL_CHARSET: ${MYSQL_CHARSET:-utf8mb4}
-      MYSQL_COLLATION: ${MYSQL_COLLATION:-utf8mb4_unicode_ci}
-      MYSQL_SQL_MODE: ${MYSQL_SQL_MODE:-TRADITIONAL}
+      MYSQL_URL: mysql://${MYSQL_USER:-mcp_user}:${MYSQL_PASSWORD:-mcp_password}@mysql:3306/${MYSQL_DATABASE:-mcp_database}?charset=${MYSQL_CHARSET:-utf8mb4}&collation=${MYSQL_COLLATION:-utf8mb4_unicode_ci}&sql_mode=${MYSQL_SQL_MODE:-TRADITIONAL}
       PYTHONUNBUFFERED: 1
       PYTHONDONTWRITEBYTECODE: 1
     depends_on:

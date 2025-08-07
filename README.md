@@ -56,37 +56,45 @@ A robust, secure, and feature-rich Model Context Protocol (MCP) server for MySQL
 
 ### Environment Variables
 
-| Variable                   | Description                  | Default              | Required |
-| -------------------------- | ---------------------------- | -------------------- | -------- |
-| `MYSQL_HOST`               | MySQL server host            | `localhost`          | No       |
-| `MYSQL_PORT`               | MySQL server port            | `3306`               | No       |
-| `MYSQL_USER`               | MySQL username               | -                    | **Yes**  |
-| `MYSQL_PASSWORD`           | MySQL password               | -                    | **Yes**  |
-| `MYSQL_DATABASE`           | MySQL database name          | -                    | **Yes**  |
-| `MYSQL_CHARSET`            | Character set                | `utf8mb4`            | No       |
-| `MYSQL_COLLATION`          | Collation                    | `utf8mb4_unicode_ci` | No       |
-| `MYSQL_AUTOCOMMIT`         | Auto-commit mode             | `true`               | No       |
-| `MYSQL_SQL_MODE`           | SQL mode                     | `TRADITIONAL`        | No       |
-| `MYSQL_CONNECTION_TIMEOUT` | Connection timeout (seconds) | `10`                 | No       |
-| `MYSQL_POOL_SIZE`          | Connection pool size         | `5`                  | No       |
-| `MYSQL_POOL_RESET_SESSION` | Reset session on return      | `true`               | No       |
+| Variable                   | Description                      | Default              | Required |
+| -------------------------- | -------------------------------- | -------------------- | -------- |
+| `MYSQL_URL`                | MySQL connection URL (preferred) | -                    | **No\*** |
+| `MYSQL_HOST`               | MySQL server host                | `localhost`          | No       |
+| `MYSQL_PORT`               | MySQL server port                | `3306`               | No       |
+| `MYSQL_USER`               | MySQL username                   | -                    | **Yes**  |
+| `MYSQL_PASSWORD`           | MySQL password                   | -                    | **Yes**  |
+| `MYSQL_DATABASE`           | MySQL database name              | -                    | **Yes**  |
+| `MYSQL_CHARSET`            | Character set                    | `utf8mb4`            | No       |
+| `MYSQL_COLLATION`          | Collation                        | `utf8mb4_unicode_ci` | No       |
+| `MYSQL_AUTOCOMMIT`         | Auto-commit mode                 | `true`               | No       |
+| `MYSQL_SQL_MODE`           | SQL mode                         | `TRADITIONAL`        | No       |
+| `MYSQL_CONNECTION_TIMEOUT` | Connection timeout (seconds)     | `10`                 | No       |
+| `MYSQL_POOL_SIZE`          | Connection pool size             | `5`                  | No       |
+| `MYSQL_POOL_RESET_SESSION` | Reset session on return          | `true`               | No       |
+
+**Note:** Either `MYSQL_URL` or the individual `MYSQL_USER`, `MYSQL_PASSWORD`, and `MYSQL_DATABASE` variables are required. If `MYSQL_URL` is provided, it takes precedence over individual variables.
 
 ### Example Configuration
 
 ```bash
 # .env file
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
-MYSQL_USER=myuser
-MYSQL_PASSWORD=mypassword
-MYSQL_DATABASE=mydatabase
-MYSQL_CHARSET=utf8mb4
-MYSQL_COLLATION=utf8mb4_unicode_ci
-MYSQL_AUTOCOMMIT=true
-MYSQL_SQL_MODE=TRADITIONAL
-MYSQL_CONNECTION_TIMEOUT=10
-MYSQL_POOL_SIZE=5
-MYSQL_POOL_RESET_SESSION=true
+
+# Option 1: Using MySQL URL (Recommended)
+MYSQL_URL=mysql://myuser:mypassword@localhost:3306/mydatabase?charset=utf8mb4&collation=utf8mb4_unicode_ci&sql_mode=TRADITIONAL
+
+# Option 2: Using individual variables
+# MYSQL_HOST=localhost
+# MYSQL_PORT=3306
+# MYSQL_USER=myuser
+# MYSQL_PASSWORD=mypassword
+# MYSQL_DATABASE=mydatabase
+# MYSQL_CHARSET=utf8mb4
+# MYSQL_COLLATION=utf8mb4_unicode_ci
+# MYSQL_AUTOCOMMIT=true
+# MYSQL_SQL_MODE=TRADITIONAL
+# MYSQL_CONNECTION_TIMEOUT=10
+# MYSQL_POOL_SIZE=5
+# MYSQL_POOL_RESET_SESSION=true
 ```
 
 ## 📊 Performance
@@ -185,7 +193,7 @@ The project follows strict code quality standards:
 Error: Missing required database configuration
 ```
 
-**Solution:** Ensure all required environment variables are set (MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE).
+**Solution:** Ensure all required environment variables are set. Either provide MYSQL_URL or the individual variables (MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE).
 
 #### Permission Errors
 

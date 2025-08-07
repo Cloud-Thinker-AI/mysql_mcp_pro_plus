@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse, parse_qs
 
 from pydantic import BaseModel, Field
 
@@ -24,15 +25,68 @@ class DatabaseConfig(BaseModel):
     )
 
     @classmethod
+    def from_url(cls, url: str) -> "DatabaseConfig":
+        """Create DatabaseConfig from MySQL connection URL.
+
+        Expected format: mysql://user:password@host:port/database?charset=utf8mb4&collation=utf8mb4_unicode_ci
+        """
+        parsed = urlparse(url)
+
+        if parsed.scheme not in ("mysql", "mysql+pymysql"):
+            raise ValueError(
+                f"Invalid URL scheme: {parsed.scheme}. Expected 'mysql' or 'mysql+pymysql'"
+            )
+
+        if not all([parsed.username, parsed.password, parsed.path.lstrip("/")]):
+            raise ValueError("URL must include username, password, and database name")
+
+        # Parse query parameters
+        query_params = parse_qs(parsed.query) if parsed.query else {}
+
+        def get_param(key: str, default: str) -> str:
+            return query_params.get(key, [default])[0]
+
+        def get_bool_param(key: str, default: bool) -> bool:
+            return get_param(key, str(default)).lower() == "true"
+
+        def get_int_param(key: str, default: int) -> int:
+            return int(get_param(key, str(default)))
+
+        return cls(
+            host=parsed.hostname or "localhost",
+            port=parsed.port or 3306,
+            user=parsed.username or "",
+            password=parsed.password or "",
+            database=parsed.path.lstrip("/"),
+            charset=get_param("charset", "utf8mb4"),
+            collation=get_param("collation", "utf8mb4_unicode_ci"),
+            autocommit=get_bool_param("autocommit", True),
+            sql_mode=get_param("sql_mode", "TRADITIONAL"),
+            connection_timeout=get_int_param("connection_timeout", 10),
+            pool_size=get_int_param("pool_size", 5),
+            pool_reset_session=get_bool_param("pool_reset_session", True),
+        )
+
+    @classmethod
     def from_env(cls) -> "DatabaseConfig":
-        """Create DatabaseConfig from environment variables with validation."""
+        """Create DatabaseConfig from environment variables with validation.
+
+        Supports both MYSQL_URL (preferred) and individual environment variables.
+        If MYSQL_URL is provided, it takes precedence over individual variables.
+        """
+        # Check for connection URL first
+        mysql_url = os.getenv("MYSQL_URL")
+        if mysql_url:
+            return cls.from_url(mysql_url)
+
+        # Fallback to individual environment variables
         user = os.getenv("MYSQL_USER")
         password = os.getenv("MYSQL_PASSWORD")
         database = os.getenv("MYSQL_DATABASE")
 
         if not all([user, password, database]):
             raise ValueError(
-                "Missing required database configuration: MYSQL_USER, MYSQL_PASSWORD, and MYSQL_DATABASE are required"
+                "Missing required database configuration: Either MYSQL_URL or MYSQL_USER, MYSQL_PASSWORD, and MYSQL_DATABASE are required"
             )
 
         # At this point, we know user, password, and database are not None
