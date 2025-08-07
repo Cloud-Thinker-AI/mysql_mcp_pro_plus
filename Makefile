@@ -19,8 +19,7 @@ up-mcp:
 	docker compose up --build mcp-server -d
 
 down: ## Stop and remove all containers, networks, and volumes
-	@echo "Stopping and removing all services..."
-	docker compose down -v
+	docker compose down
 
 # Logging and monitoring
 logs: ## Show logs from all services
@@ -37,6 +36,32 @@ status: ## Show status of all services
 	docker compose ps
 
 ps: status ## Alias for status
+
+
+# Clean build artifacts
+clean-build:
+	@echo "🧹 Cleaning build artifacts..."
+	rm -rf dist/
+	rm -rf build/
+	rm -rf *.egg-info/
+	rm -rf .pytest_cache/
+	rm -rf __pycache__/
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete
+	@echo "✅ Clean complete"
+
+# Build distributions
+build: clean-build
+	@echo "📦 Building distributions..."
+	uv build
+	@echo "✅ Build complete"
+	@ls -la dist/
+
+# Check package integrity
+check:
+	@echo "🔍 Checking package..."
+	uv run twine check dist/*
+	@echo "✅ Check complete"
 
 # Development and testing
 test: ## Run tests

@@ -9,6 +9,7 @@ from .tools import (
     describe_table_tool,
     get_database_overview_tool,
     get_blocking_queries_tool,
+    analyze_db_health_tool,
 )
 
 from .logger import logger
@@ -128,6 +129,36 @@ async def get_blocking_queries(timeout: int = 300) -> str:
     """
     global _db_manager
     return await get_blocking_queries_tool(_db_manager, timeout)
+
+
+@mcp.tool()
+async def analyze_db_health(timeout: int = 300) -> str:
+    """Perform comprehensive MySQL database health analysis.
+
+    Enterprise-grade health monitoring covering:
+    - Index Health: Usage statistics, unused indexes, duplicates, and optimization recommendations
+    - Connection Pool: Current usage, limits, thread cache efficiency, and connection issues
+    - Buffer Pool: InnoDB buffer pool efficiency, hit ratios, and memory utilization
+    - Replication: Master/slave status, lag monitoring, and replication health
+    - Constraints: Foreign key integrity, constraint violations, and orphaned records
+    - Auto-increment: Sequence analysis, exhaustion warnings, and capacity planning
+    - Fragmentation: Table fragmentation analysis and optimization candidates
+    - Performance: Query cache, slow queries, table locks, and key efficiency metrics
+    - Storage Engines: Engine distribution, MyISAM vs InnoDB analysis
+    - Security: User accounts, SSL status, and security configuration review
+
+    Health Scoring:
+    - Overall health score (0-100) with section-specific scoring
+    - 🚨 Critical issues requiring immediate attention
+    - ⚠️ Warnings for potential problems
+    - 💡 Optimization recommendations for performance improvements
+    - 🎯 Hotspot identification for proactive maintenance
+
+    Args:
+        timeout: Maximum execution time in seconds (default: 300)
+    """
+    global _db_manager
+    return await analyze_db_health_tool(_db_manager, timeout)
 
 
 def main():

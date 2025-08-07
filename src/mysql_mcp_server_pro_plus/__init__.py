@@ -1,9 +1,17 @@
-def main():
+import asyncio
+import sys
+
+from . import server
+
+
+def cli_main():
     """Main entry point for the package."""
-    from . import server
+    # Handle platform-specific configurations
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     server.main()
 
 
-# Expose important items at package level
-__all__ = ["main"]
+# Expose main function for script entry
+__all__ = ["cli_main", "server"]
