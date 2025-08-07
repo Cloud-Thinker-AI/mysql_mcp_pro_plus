@@ -3,7 +3,12 @@ from fastmcp import FastMCP
 from .config import DatabaseConfig
 from .db_manager import DatabaseManager
 from .validator import SecurityValidator
-from .tools import execute_sql_tool, list_tables_tool, describe_table_tool
+from .tools import (
+    execute_sql_tool,
+    list_tables_tool,
+    describe_table_tool,
+    get_database_overview_tool,
+)
 
 from .logger import logger
 
@@ -72,6 +77,30 @@ async def describe_table(table_name: str) -> str:
     """
     global _db_manager, _security_validator
     return await describe_table_tool(table_name, _db_manager, _security_validator)
+
+
+@mcp.tool()
+async def get_database_overview(
+    max_tables: int = 500, sampling_mode: bool = True, timeout: int = 300
+) -> str:
+    """Get comprehensive database overview with performance and security analysis.
+
+    Enterprise-grade comprehensive database assessment providing multi-dimensional analysis:
+    - Schema Analysis: Complete structure with table relationships and dependency mapping
+    - Performance Metrics: Query performance, index efficiency, and resource utilization patterns
+    - Security Analysis: User permissions, role assignments, and security configuration assessment
+    - Storage Analysis: Table sizes, index bloat detection, and disk usage optimization
+    - Health Indicators: Connection health, vacuum statistics, and system performance metrics
+
+    Args:
+        max_tables: Maximum number of tables to analyze per schema (default: 500)
+        sampling_mode: Use statistical sampling for large datasets to optimize execution time (default: True)
+        timeout: Maximum execution time in seconds with graceful timeout handling (default: 300)
+    """
+    global _db_manager, _security_validator
+    return await get_database_overview_tool(
+        _db_manager, _security_validator, max_tables, sampling_mode, timeout
+    )
 
 
 def main():
