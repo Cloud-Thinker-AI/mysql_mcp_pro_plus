@@ -1,108 +1,221 @@
 # MySQL MCP Server Pro Plus
 
-A Model Context Protocol (MCP) implementation that enables secure interaction with MySQL databases. This server component facilitates communication between AI applications (hosts/clients) and MySQL databases, making database exploration and analysis safer and more structured through a controlled interface.
+A robust, secure, and feature-rich Model Context Protocol (MCP) server for MySQL databases. This server provides a standardized interface for AI assistants to interact with MySQL databases through tools and resources.
 
-> **Note**: MySQL MCP Server is not designed to be used as a standalone server, but rather as a communication protocol implementation between AI applications and MySQL databases.
+## 🚀 Features
 
-## Features
+### Core Features
 
-- List available MySQL tables as resources
-- Read table contents
-- Execute SQL queries with proper error handling
-- Secure database access through environment variables
-- Comprehensive logging
+- **Secure Database Operations**: Input validation, SQL injection protection, and query sanitization
+- **Connection Pooling**: Efficient connection management with configurable pool settings
+- **Type Safety**: Full type annotations and Pydantic models for configuration validation
+- **Comprehensive Error Handling**: Detailed error messages and proper exception handling
+- **Async/Await Support**: Modern async patterns for better performance
+- **Resource Management**: Proper cleanup of database connections and cursors
+- **Test Data Generation**: Comprehensive e-commerce database simulation with 10M+ rows and bad practices for MCP agent testing
 
-## Usage
+### Tools Available
 
-### With Claude Desktop
+- `execute_sql`: Execute custom SQL queries with result formatting
+- `list_tables`: List all tables in the database
+- `describe_table`: Get detailed table structure information
 
-Add this to your `claude_desktop_config.json`:
+### Resources
 
-```json
-{
-  "mcpServers": {
-    "mysql": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "path/to/mysql_mcp_server",
-        "run",
-        "mysql_mcp_server_pro_plus"
-      ],
-      "env": {
-        "MYSQL_HOST": "localhost",
-        "MYSQL_PORT": "3306",
-        "MYSQL_USER": "your_username",
-        "MYSQL_PASSWORD": "your_password",  # pragma: allowlist secret
-        "MYSQL_DATABASE": "your_database"
-      }
-    }
-  }
-}
+- **Table Data**: Access table contents as CSV-formatted resources
+- **Automatic Discovery**: Dynamic table listing and resource creation
+
+## 📋 Requirements
+
+- Python 3.8+
+- MySQL 5.7+ or MariaDB 10.2+
+- mysql-connector-python
+
+## 🛠️ Installation
+
+1. **Clone the repository**:
+
+   ```bash
+   git clone <repository-url>
+   cd mysql_mcp_server_pro_plus
+   ```
+
+2. **Install dependencies**:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Set up environment variables**:
+   ```bash
+   cp env.example .env
+   # Edit .env with your MySQL configuration
+   ```
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+| Variable                   | Description                  | Default              | Required |
+| -------------------------- | ---------------------------- | -------------------- | -------- |
+| `MYSQL_HOST`               | MySQL server host            | `localhost`          | No       |
+| `MYSQL_PORT`               | MySQL server port            | `3306`               | No       |
+| `MYSQL_USER`               | MySQL username               | -                    | **Yes**  |
+| `MYSQL_PASSWORD`           | MySQL password               | -                    | **Yes**  |
+| `MYSQL_DATABASE`           | MySQL database name          | -                    | **Yes**  |
+| `MYSQL_CHARSET`            | Character set                | `utf8mb4`            | No       |
+| `MYSQL_COLLATION`          | Collation                    | `utf8mb4_unicode_ci` | No       |
+| `MYSQL_AUTOCOMMIT`         | Auto-commit mode             | `true`               | No       |
+| `MYSQL_SQL_MODE`           | SQL mode                     | `TRADITIONAL`        | No       |
+| `MYSQL_CONNECTION_TIMEOUT` | Connection timeout (seconds) | `10`                 | No       |
+| `MYSQL_POOL_SIZE`          | Connection pool size         | `5`                  | No       |
+| `MYSQL_POOL_RESET_SESSION` | Reset session on return      | `true`               | No       |
+
+### Example Configuration
+
+```bash
+# .env file
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=myuser
+MYSQL_PASSWORD=mypassword
+MYSQL_DATABASE=mydatabase
+MYSQL_CHARSET=utf8mb4
+MYSQL_COLLATION=utf8mb4_unicode_ci
+MYSQL_AUTOCOMMIT=true
+MYSQL_SQL_MODE=TRADITIONAL
+MYSQL_CONNECTION_TIMEOUT=10
+MYSQL_POOL_SIZE=5
+MYSQL_POOL_RESET_SESSION=true
 ```
 
-````
+## 📊 Performance
 
-### With Visual Studio Code
+### Optimizations
 
-Add this to your `mcp.json`:
+- **Connection Pooling**: Reuses database connections for better performance
+- **Async Operations**: Non-blocking database operations
+- **Efficient Query Execution**: Optimized query handling and result processing
+- **Memory Management**: Proper cleanup prevents memory leaks
 
-```json
-{
-  "servers": {
-    "mysql": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["--from", "mysql-mcp-server", "mysql_mcp_server_pro_plus"],
-      "env": {
-        "MYSQL_HOST": "localhost",
-        "MYSQL_PORT": "3306",
-        "MYSQL_USER": "your_username",
-        "MYSQL_PASSWORD": "your_password",  # pragma: allowlist secret
-        "MYSQL_DATABASE": "your_database"
-      }
-    }
-  }
-}
-````
+### Monitoring
+
+- **Comprehensive Logging**: Detailed logs for debugging and monitoring
+- **Error Tracking**: Structured error reporting with context
+- **Performance Metrics**: Connection and query performance tracking
+
+## 🔧 Development
+
+### Project Structure
 
 ```
+mysql_mcp_server_pro_plus/
+├── src/
+│   └── mysql_mcp_server_pro_plus/
+│       ├── __init__.py
+│       └── server.py          # Main server implementation
+├── tests/
+│   ├── conftest.py           # Test configuration
+│   └── test_server.py        # Server tests
+├── scripts/
+│   └── generate_test_data.py # Test data generator (10M+ rows)
+├── init-scripts/
+│   └── 01-init.sql          # Database initialization with bad practices
+├── docker-compose.yml        # Docker Compose configuration
+├── Dockerfile               # Docker image definition
+├── pyproject.toml           # Project configuration
+├── requirements.txt         # Python dependencies
+├── README.md               # This file
+└── README-TEST-DATA.md     # Test data generation documentation
+```
 
-## Security Considerations
+### Test Data Generation
 
-- Never commit environment variables or credentials
-- Use a database user with minimal required permissions
-- Consider implementing query whitelisting for production use
-- Monitor and log all database operations
+For comprehensive MCP agent testing, the project includes a sophisticated test data generation system:
 
-## Security Best Practices
+- **Complex E-commerce Database**: 8 interconnected tables with realistic relationships
+- **10+ Million Rows**: Distributed across users, products, orders, reviews, and payments
+- **1 Million Transactions**: Mixed SELECT, INSERT, UPDATE, and DELETE operations
+- **Intentional Bad Practices**: Security vulnerabilities, performance issues, and design flaws for MCP agent detection
 
-This MCP implementation requires database access to function. For security:
+See [README-TEST-DATA.md](README-TEST-DATA.md) for detailed documentation.
 
-1. **Create a dedicated MySQL user** with minimal permissions
-2. **Never use root credentials** or administrative accounts
-3. **Restrict database access** to only necessary operations
-4. **Enable logging** for audit purposes
-5. **Regular security reviews** of database access
+**Quick Start:**
 
-See [MySQL Security Configuration Guide](https://github.com/designcomputer/mysql_mcp_server/blob/main/SECURITY.md) for detailed instructions on:
+```bash
+# Start the database
+make up
 
-- Creating a restricted MySQL user
-- Setting appropriate permissions
-- Monitoring database access
-- Security best practices
+# Generate test data (Docker)
+make generate-test-data-docker
 
-⚠️ IMPORTANT: Always follow the principle of least privilege when configuring database access.
+# Or generate locally
+make generate-test-data
 
-## License
+# Verify bad practices
+make verify-bad-practices-docker
+```
 
-MIT License - see LICENSE file for details.
+### Code Quality
 
-## Contributing
+The project follows strict code quality standards:
+
+- **Type Annotations**: Full type hints for better IDE support and error detection
+- **Pydantic Models**: Data validation and serialization
+- **Async/Await**: Modern Python async patterns
+- **Error Handling**: Comprehensive exception handling
+- **Documentation**: Detailed docstrings and comments
+
+### Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Run the test suite
+6. Submit a pull request
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### Connection Errors
+
 ```
+Error: Missing required database configuration
+```
+
+**Solution:** Ensure all required environment variables are set (MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE).
+
+#### Permission Errors
+
+```
+Error: Access denied for user
+```
+
+**Solution:** Check MySQL user permissions and ensure the user has access to the specified database.
+
+#### Character Set Issues
+
+```
+Error: Unknown collation
+```
+
+**Solution:** Update MYSQL_CHARSET and MYSQL_COLLATION to values supported by your MySQL version.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Support
+
+For support and questions:
+
+1. Check the [troubleshooting section](#-troubleshooting)
+2. Review the [test files](tests/) for usage examples
+3. Open an issue on GitHub
+4. Check the [CHANGELOG.md](CHANGELOG.md) for recent updates
+
+## 🔄 Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a detailed history of changes and improvements.

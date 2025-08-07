@@ -36,7 +36,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 40s
-    command: --default-authentication-plugin=mysql_native_password
 
   # MySQL MCP Server Service
   mcp-server:
@@ -62,6 +61,8 @@ services:
         condition: service_healthy
     networks:
       - mcp_network
+    ports:
+      - "8084:8084"
     volumes:
       - ./logs:/app/logs
     healthcheck:

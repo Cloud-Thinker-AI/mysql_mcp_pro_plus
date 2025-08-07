@@ -1,11 +1,10 @@
-import asyncio
 import logging
-import os
-import sys
-from mysql.connector import connect, Error
-from mcp.server import Server
-from mcp.types import Resource, Tool, TextContent
-from pydantic import AnyUrl
+
+from fastmcp import FastMCP
+
+from .config import DatabaseConfig
+from .db_manager import DatabaseManager
+from .validator import SecurityValidator
 
 # Configure logging
 logging.basicConfig(
@@ -14,228 +13,153 @@ logging.basicConfig(
 logger = logging.getLogger("mysql_mcp_server_pro_plus")
 
 
-def get_db_config():
-    """Get database configuration from environment variables."""
-    config = {
-        "host": os.getenv("MYSQL_HOST", "localhost"),
-        "port": int(os.getenv("MYSQL_PORT", "3306")),
-        "user": os.getenv("MYSQL_USER"),
-        "password": os.getenv("MYSQL_PASSWORD"),
-        "database": os.getenv("MYSQL_DATABASE"),
-        # Add charset and collation to avoid utf8mb4_0900_ai_ci issues with older MySQL versions
-        # These can be overridden via environment variables for specific MySQL versions
-        "charset": os.getenv("MYSQL_CHARSET", "utf8mb4"),
-        "collation": os.getenv("MYSQL_COLLATION", "utf8mb4_unicode_ci"),
-        # Disable autocommit for better transaction control
-        "autocommit": True,
-        # Set SQL mode for better compatibility - can be overridden
-        "sql_mode": os.getenv("MYSQL_SQL_MODE", "TRADITIONAL"),
-    }
+# Initialize FastMCP server
+mcp = FastMCP("mysql_mcp_server_pro_plus")
 
-    # Remove None values to let MySQL connector use defaults if not specified
-    config = {k: v for k, v in config.items() if v is not None}
-
-    if not all([config.get("user"), config.get("password"), config.get("database")]):
-        logger.error(
-            "Missing required database configuration. Please check environment variables:"
-        )
-        logger.error("MYSQL_USER, MYSQL_PASSWORD, and MYSQL_DATABASE are required")
-        raise ValueError("Missing required database configuration")
-
-    return config
+# Module-level variables for database managers (initialized when server starts)
+_db_manager = None
+_security_validator = None
 
 
-# Initialize server
-app = Server("mysql_mcp_server_pro_plus")
-
-
-@app.list_resources()
-async def list_resources() -> list[Resource]:
-    """List MySQL tables as resources."""
-    config = get_db_config()
+@mcp.resource("mysql://{table_name}/data")
+async def read_table_data(table_name: str) -> str:
+    """Read data from a MySQL table."""
     try:
-        logger.info(
-            f"Connecting to MySQL with charset: {config.get('charset')}, collation: {config.get('collation')}"
-        )
-        with connect(**config) as conn:
-            logger.info(
-                f"Successfully connected to MySQL server version: {conn.get_server_info()}"
-            )
-            with conn.cursor() as cursor:
-                cursor.execute("SHOW TABLES")
-                tables = cursor.fetchall()
-                logger.info(f"Found tables: {tables}")
+        logger.info(f"Reading table data: {table_name}")
 
-                resources = []
-                for table in tables:
-                    resources.append(
-                        Resource(
-                            uri=f"mysql://{table[0]}/data",
-                            name=f"Table: {table[0]}",
-                            mimeType="text/plain",
-                            description=f"Data in table: {table[0]}",
-                        )
-                    )
-                return resources
-    except Error as e:
-        logger.error(f"Failed to list resources: {str(e)}")
-        logger.error(f"Error code: {e.errno}, SQL state: {e.sqlstate}")
-        return []
+        global _db_manager, _security_validator
+        if not _db_manager or not _security_validator:
+            raise RuntimeError("Server not properly initialized")
+
+        if not _security_validator._is_valid_table_name(table_name):
+            raise ValueError(f"Invalid table name: {table_name}")
+
+        result = await _db_manager.get_table_data(table_name)
+
+        if not result.has_results:
+            return "No data available"
+
+        # Format results as CSV
+        lines = [",".join(result.columns)]
+        for row in result.rows:
+            lines.append(",".join(str(cell) for cell in row))
+
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error(f"Error reading table {table_name}: {e}")
+        raise RuntimeError(f"Failed to read table: {str(e)}")
 
 
-@app.read_resource()
-async def read_resource(uri: AnyUrl) -> str:
-    """Read table contents."""
-    config = get_db_config()
-    uri_str = str(uri)
-    logger.info(f"Reading resource: {uri_str}")
+@mcp.tool()
+async def execute_sql(query: str) -> str:
+    """Execute an SQL query on the MySQL server.
 
-    if not uri_str.startswith("mysql://"):
-        raise ValueError(f"Invalid URI scheme: {uri_str}")
-
-    parts = uri_str[8:].split("/")
-    table = parts[0]
-
+    Args:
+        query: The SQL query to execute
+    """
     try:
-        logger.info(
-            f"Connecting to MySQL with charset: {config.get('charset')}, collation: {config.get('collation')}"
-        )
-        with connect(**config) as conn:
-            logger.info(
-                f"Successfully connected to MySQL server version: {conn.get_server_info()}"
-            )
-            with conn.cursor() as cursor:
-                # Use parameterized query to prevent SQL injection
-                # nosec B608 - This is a safe table name validation
-                safe_table = table.replace("`", "``")
-                cursor.execute(f"SELECT * FROM `{safe_table}` LIMIT 100")  # nosec B608
-                columns = [desc[0] for desc in cursor.description]
-                rows = cursor.fetchall()
-                result = [",".join(map(str, row)) for row in rows]
-                return "\n".join([",".join(columns)] + result)
+        logger.info(f"Executing SQL query: {query[:100]}...")
 
-    except Error as e:
-        logger.error(f"Database error reading resource {uri}: {str(e)}")
-        logger.error(f"Error code: {e.errno}, SQL state: {e.sqlstate}")
-        raise RuntimeError(f"Database error: {str(e)}")
+        global _db_manager, _security_validator
+        if not _db_manager or not _security_validator:
+            raise RuntimeError("Server not properly initialized")
 
+        # Validate and sanitize query
+        validated_query = _security_validator.validate_query(query)
 
-@app.list_tools()
-async def list_tools() -> list[Tool]:
-    """List available MySQL tools."""
-    logger.info("Listing tools...")
-    return [
-        Tool(
-            name="execute_sql",
-            description="Execute an SQL query on the MySQL server",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The SQL query to execute",
-                    }
-                },
-                "required": ["query"],
-            },
-        )
-    ]
+        # Execute query
+        result = await _db_manager.execute_query(validated_query)
+
+        if result.has_results:
+            # Format results as CSV
+            lines = [",".join(result.columns)]
+            for row in result.rows:
+                lines.append(",".join(str(cell) for cell in row))
+            return "\n".join(lines)
+        else:
+            return f"Query executed successfully. Rows affected: {result.row_count}"
+
+    except Exception as e:
+        logger.error(f"SQL execution error: {e}")
+        return f"Error: {str(e)}"
 
 
-@app.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    """Execute SQL commands."""
-    config = get_db_config()
-    logger.info(f"Calling tool: {name} with arguments: {arguments}")
-
-    if name != "execute_sql":
-        raise ValueError(f"Unknown tool: {name}")
-
-    query = arguments.get("query")
-    if not query:
-        raise ValueError("Query is required")
-
+@mcp.tool()
+async def list_tables() -> str:
+    """List all tables in the database."""
     try:
-        logger.info(
-            f"Connecting to MySQL with charset: {config.get('charset')}, collation: {config.get('collation')}"
-        )
-        with connect(**config) as conn:
-            logger.info(
-                f"Successfully connected to MySQL server version: {conn.get_server_info()}"
-            )
-            with conn.cursor() as cursor:
-                cursor.execute(query)
+        logger.info("Listing database tables")
 
-                # Special handling for SHOW TABLES
-                if query.strip().upper().startswith("SHOW TABLES"):
-                    tables = cursor.fetchall()
-                    result = ["Tables_in_" + config["database"]]  # Header
-                    result.extend([table[0] for table in tables])
-                    return [TextContent(type="text", text="\n".join(result))]
+        global _db_manager
+        if not _db_manager:
+            raise RuntimeError("Database manager not initialized")
 
-                # Handle all other queries that return result sets (SELECT, SHOW, DESCRIBE etc.)
-                elif cursor.description is not None:
-                    columns = [desc[0] for desc in cursor.description]
-                    try:
-                        rows = cursor.fetchall()
-                        result = [",".join(map(str, row)) for row in rows]
-                        return [
-                            TextContent(
-                                type="text",
-                                text="\n".join([",".join(columns)] + result),
-                            )
-                        ]
-                    except Error as e:
-                        logger.warning(f"Error fetching results: {str(e)}")
-                        return [
-                            TextContent(
-                                type="text",
-                                text=f"Query executed but error fetching results: {str(e)}",
-                            )
-                        ]
+        tables = await _db_manager.get_tables()
+        if tables:
+            return "\n".join(tables)
+        else:
+            return "No tables found"
 
-                # Non-SELECT queries
-                else:
-                    conn.commit()
-                    return [
-                        TextContent(
-                            type="text",
-                            text=f"Query executed successfully. Rows affected: {cursor.rowcount}",
-                        )
-                    ]
-
-    except Error as e:
-        logger.error(f"Error executing SQL '{query}': {e}")
-        logger.error(f"Error code: {e.errno}, SQL state: {e.sqlstate}")
-        return [TextContent(type="text", text=f"Error executing query: {str(e)}")]
+    except Exception as e:
+        logger.error(f"Error listing tables: {e}")
+        return f"Error: {str(e)}"
 
 
-async def main():
+@mcp.tool()
+async def describe_table(table_name: str) -> str:
+    """Describe the structure of a table.
+
+    Args:
+        table_name: Name of the table to describe
+    """
+    try:
+        logger.info(f"Describing table: {table_name}")
+
+        global _db_manager, _security_validator
+        if not _db_manager or not _security_validator:
+            raise RuntimeError("Server not properly initialized")
+
+        if not _security_validator._is_valid_table_name(table_name):
+            raise ValueError(f"Invalid table name: {table_name}")
+
+        query = f"DESCRIBE `{table_name}`"
+        result = await _db_manager.execute_query(query)
+
+        if result.has_results:
+            lines = [",".join(result.columns)]
+            for row in result.rows:
+                lines.append(",".join(str(cell) for cell in row))
+            return "\n".join(lines)
+        else:
+            return "No table structure information available"
+
+    except Exception as e:
+        logger.error(f"Error describing table {table_name}: {e}")
+        return f"Error: {str(e)}"
+
+
+def main():
     """Main entry point to run the MCP server."""
-    from mcp.server.stdio import stdio_server
+    # Initialize database configuration and managers
+    global _db_manager, _security_validator
 
-    # Add additional debug output
-    print("Starting MySQL MCP server with config:", file=sys.stderr)
-    config = get_db_config()
-    print(f"Host: {config['host']}", file=sys.stderr)
-    print(f"Port: {config['port']}", file=sys.stderr)
-    print(f"User: {config['user']}", file=sys.stderr)
-    print(f"Database: {config['database']}", file=sys.stderr)
+    try:
+        db_config = DatabaseConfig.from_env()
+        _db_manager = DatabaseManager(db_config)
+        _security_validator = SecurityValidator()
 
-    logger.info("Starting MySQL MCP server...")
-    logger.info(
-        f"Database config: {config['host']}/{config['database']} as {config['user']}"
-    )
+        # Log configuration (without sensitive data)
+        logger.info("Starting MySQL MCP server...")
+        logger.info(f"Database: {db_config.host}:{db_config.port}/{db_config.database}")
+        logger.info(f"Charset: {db_config.charset}, Collation: {db_config.collation}")
 
-    async with stdio_server() as (read_stream, write_stream):
-        try:
-            await app.run(
-                read_stream, write_stream, app.create_initialization_options()
-            )
-        except Exception as e:
-            logger.error(f"Server error: {str(e)}", exc_info=True)
-            raise
+        # Run the FastMCP server
+        mcp.run(
+            transport="streamable-http",
+            port=8084,
+            host="0.0.0.0",
+        )
 
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    except Exception as e:
+        logger.error(f"Failed to start server: {e}", exc_info=True)
+        raise
