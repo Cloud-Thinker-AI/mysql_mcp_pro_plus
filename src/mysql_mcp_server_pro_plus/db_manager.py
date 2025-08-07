@@ -1,4 +1,3 @@
-import logging
 import re
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
@@ -8,8 +7,7 @@ from mysql.connector import connect, Error
 from pydantic import BaseModel, Field
 
 from .config import DatabaseConfig
-
-logger = logging.getLogger(__name__)
+from .logger import logger
 
 
 class QueryResult(BaseModel):
@@ -53,6 +51,8 @@ class DatabaseManager:
         conn = None
         try:
             conn = connect(**self._get_connection_params())
+            if conn is None:
+                raise ValueError("No connection available")
             logger.debug(f"Connected to MySQL server version: {conn.get_server_info()}")
             yield conn
         except Error as e:
@@ -83,6 +83,9 @@ class DatabaseManager:
     async def execute_query(self, query: str) -> QueryResult:
         """Execute a query and return results."""
         async with self.get_connection() as conn:
+            if conn is None:
+                raise ValueError("No connection available")
+
             async with self.get_cursor(conn) as cursor:
                 try:
                     cursor.execute(query)

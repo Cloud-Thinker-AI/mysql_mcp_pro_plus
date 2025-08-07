@@ -1,16 +1,10 @@
-import logging
-
 from fastmcp import FastMCP
 
 from .config import DatabaseConfig
 from .db_manager import DatabaseManager
 from .validator import SecurityValidator
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("mysql_mcp_server_pro_plus")
+from .logger import logger
 
 
 # Initialize FastMCP server

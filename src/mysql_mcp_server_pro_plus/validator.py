@@ -1,8 +1,6 @@
-import logging
 import re
 from typing import Tuple
-
-logger = logging.getLogger(__name__)
+from .logger import logger
 
 
 class SecurityValidator:
