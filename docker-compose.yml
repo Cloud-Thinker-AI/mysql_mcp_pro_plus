@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-mcp_database}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ecommerce_db}
       MYSQL_USER: ${MYSQL_USER:-mcp_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-mcp_password}
       MYSQL_CHARSET: ${MYSQL_CHARSET:-utf8mb4}
