@@ -27,9 +27,15 @@ CREATE TABLE IF NOT EXISTS categories (
     category_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
-    parent_category_id INT, -- BAD: No foreign key constraint
+    parent_category_id INT NULL,
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_categories_parent (parent_category_id),
+    CONSTRAINT fk_categories_parent
+        FOREIGN KEY (parent_category_id)
+        REFERENCES categories(category_id)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL
 );
 
 -- BAD PRACTICE 5: Poor table design, missing indexes on frequently queried columns
@@ -39,79 +45,127 @@ CREATE TABLE IF NOT EXISTS products (
     description LONGTEXT,
     price DECIMAL(10,2) NOT NULL,
     cost_price DECIMAL(10,2),
-    category_id INT, -- BAD: No foreign key constraint
+    category_id INT NULL,
     sku VARCHAR(50),
     weight DECIMAL(8,2),
     dimensions VARCHAR(100),
     is_active BOOLEAN DEFAULT TRUE,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_products_category (category_id),
+    CONSTRAINT fk_products_category
+        FOREIGN KEY (category_id)
+        REFERENCES categories(category_id)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL
 );
 
 -- BAD PRACTICE 6: Denormalized table with redundant data
 CREATE TABLE IF NOT EXISTS inventory (
     inventory_id INT AUTO_INCREMENT PRIMARY KEY,
-    product_id INT, -- BAD: No foreign key constraint
+    product_id INT NOT NULL,
     warehouse_id INT,
     quantity INT DEFAULT 0,
     min_quantity INT DEFAULT 0,
     max_quantity INT DEFAULT 1000,
-    product_name VARCHAR(200), -- BAD: Redundant data
-    product_price DECIMAL(10,2), -- BAD: Redundant data
-    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    product_name VARCHAR(200),
+    product_price DECIMAL(10,2),
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_inventory_product (product_id),
+    CONSTRAINT fk_inventory_product
+        FOREIGN KEY (product_id)
+        REFERENCES products(product_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
 );
 
 -- BAD PRACTICE 7: No proper order status management
 CREATE TABLE IF NOT EXISTS orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT, -- BAD: No foreign key constraint
+    user_id INT NOT NULL,
     order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     total_amount DECIMAL(12,2) NOT NULL,
-    status VARCHAR(20) DEFAULT 'pending', -- BAD: No enum constraint
+    status VARCHAR(20) DEFAULT 'pending',
     shipping_address TEXT,
     billing_address TEXT,
     payment_method VARCHAR(50),
     tracking_number VARCHAR(100),
-    notes TEXT
+    notes TEXT,
+    INDEX idx_orders_user (user_id),
+    CONSTRAINT fk_orders_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(user_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
 );
 
 -- BAD PRACTICE 8: Missing important constraints and indexes
 CREATE TABLE IF NOT EXISTS order_items (
     item_id INT AUTO_INCREMENT PRIMARY KEY,
-    order_id INT, -- BAD: No foreign key constraint
-    product_id INT, -- BAD: No foreign key constraint
+    order_id INT NOT NULL,
+    product_id INT NOT NULL,
     quantity INT NOT NULL,
     unit_price DECIMAL(10,2) NOT NULL,
     total_price DECIMAL(10,2) NOT NULL,
-    product_name VARCHAR(200), -- BAD: Redundant data
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    product_name VARCHAR(200),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_order_items_order (order_id),
+    INDEX idx_order_items_product (product_id),
+    CONSTRAINT fk_order_items_order
+        FOREIGN KEY (order_id)
+        REFERENCES orders(order_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_order_items_product
+        FOREIGN KEY (product_id)
+        REFERENCES products(product_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
 );
 
 -- BAD PRACTICE 9: No proper review validation
 CREATE TABLE IF NOT EXISTS reviews (
     review_id INT AUTO_INCREMENT PRIMARY KEY,
-    product_id INT, -- BAD: No foreign key constraint
-    user_id INT, -- BAD: No foreign key constraint
-    rating INT CHECK (rating >= 1 AND rating <= 5), -- BAD: Check constraint but no foreign keys
+    product_id INT NOT NULL,
+    user_id INT NOT NULL,
+    rating INT CHECK (rating >= 1 AND rating <= 5),
     title VARCHAR(200),
     comment TEXT,
     is_verified BOOLEAN DEFAULT FALSE,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    helpful_votes INT DEFAULT 0
+    helpful_votes INT DEFAULT 0,
+    INDEX idx_reviews_product (product_id),
+    INDEX idx_reviews_user (user_id),
+    CONSTRAINT fk_reviews_product
+        FOREIGN KEY (product_id)
+        REFERENCES products(product_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_reviews_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(user_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
 );
 
 -- BAD PRACTICE 10: Sensitive payment information in plain text
 CREATE TABLE IF NOT EXISTS payments (
     payment_id INT AUTO_INCREMENT PRIMARY KEY,
-    order_id INT, -- BAD: No foreign key constraint
+    order_id INT NOT NULL,
     amount DECIMAL(12,2) NOT NULL,
     payment_method VARCHAR(50),
-    card_number VARCHAR(16), -- BAD: Plain text credit card numbers
+    card_number VARCHAR(16),
     card_expiry VARCHAR(5),
-    cvv VARCHAR(4), -- BAD: Storing CVV
+    cvv VARCHAR(4),
     transaction_id VARCHAR(100),
     status VARCHAR(20),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_payments_order (order_id),
+    CONSTRAINT fk_payments_order
+        FOREIGN KEY (order_id)
+        REFERENCES orders(order_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
 );
 
 -- BAD PRACTICE 11: Overly permissive permissions

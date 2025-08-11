@@ -13,17 +13,21 @@ from multiprocessing import cpu_count
 import mysql.connector.pooling
 
 # Database configuration with connection pooling
-DB_CONFIG = {
+CONNECTION_CONFIG = {
     "host": "localhost",
     "port": 3306,
     "user": "mcp_user",
     "password": "mcp_password",
     "database": "ecommerce_db",
-    "pool_name": "test_data_pool",
-    "pool_size": 10,
     "autocommit": False,
     "charset": "utf8mb4",
     "collation": "utf8mb4_unicode_ci",
+}
+
+POOL_CONFIG = {
+    "pool_name": "test_data_pool",
+    "pool_size": 10,
+    "pool_reset_session": True,
 }
 
 
@@ -77,7 +81,16 @@ def generate_random_price():
     return round(random.uniform(1.00, 2000.00), 2)
 
 
-def generate_users(cursor, count=1000000):
+def get_id_range(cursor, table_name: str, id_column: str = "id"):
+    """Return (min_id, max_id) for a table. Returns (None, None) if empty."""
+    cursor.execute(f"SELECT MIN({id_column}), MAX({id_column}) FROM {table_name}")
+    row = cursor.fetchone()
+    if not row:
+        return None, None
+    return row[0], row[1]
+
+
+def generate_users(connection, cursor, count=1000000):
     """Generate 1M users using batch INSERT statements"""
     print(f"Generating {count} users...")
 
@@ -85,15 +98,10 @@ def generate_users(cursor, count=1000000):
     max_user_id = cursor.fetchone()[0]
     print(f"Starting from user_id: {max_user_id + 1}")
 
-    # Optimize MySQL settings for bulk operations
-    cursor.execute("SET foreign_key_checks=0")
-    cursor.execute("SET unique_checks=0")
-    cursor.execute("SET autocommit=0")
-
     batch_size = 1000  # Reasonable batch size for INSERT statements
     for i in range(0, count, batch_size):
         batch_count = min(batch_size, count - i)
-        values = []
+        values: list[tuple] = []
 
         for j in range(batch_count):
             user_id = max_user_id + i + j + 1
@@ -110,25 +118,37 @@ def generate_users(cursor, count=1000000):
             created_date = "2024-01-01 00:00:00"
 
             values.append(
-                f"({user_id}, '{username}', '{email}', '{password}', '{first_name}', '{last_name}', '{phone}', '{address}', '{credit_card}', '{created_date}', NULL)"
+                (
+                    user_id,
+                    username,
+                    email,
+                    password,
+                    first_name,
+                    last_name,
+                    phone,
+                    address,
+                    credit_card,
+                    created_date,
+                    None,
+                )
             )
 
-        sql = f"INSERT INTO users (user_id, username, email, password, first_name, last_name, phone, address, credit_card, created_date, last_login) VALUES {','.join(values)}"
-        cursor.execute(sql)
+        sql = (
+            "INSERT INTO users (user_id, username, email, password, first_name, last_name, phone, address, credit_card, created_date, last_login) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        )
+        cursor.executemany(sql, values)
 
         if (i + batch_size) % 50000 == 0:
             print(f"Generated {min(i + batch_size, count)} users...")
-            cursor.execute("COMMIT")  # Commit periodically
+            connection.commit()  # Commit periodically
 
-    cursor.execute("COMMIT")
-    cursor.execute("SET foreign_key_checks=1")
-    cursor.execute("SET unique_checks=1")
-    cursor.execute("SET autocommit=1")
+    connection.commit()
 
     print(f"Successfully generated {count} users using batch INSERT")
 
 
-def generate_products(cursor, count=100000):
+def generate_products(connection, cursor, count=100000):
     """Generate 100K products using batch INSERT statements"""
     print(f"Generating {count} products...")
 
@@ -147,15 +167,10 @@ def generate_products(cursor, count=100000):
         "Ball",
     ]
 
-    # Optimize MySQL settings for bulk operations
-    cursor.execute("SET foreign_key_checks=0")
-    cursor.execute("SET unique_checks=0")
-    cursor.execute("SET autocommit=0")
-
     batch_size = 1000
     for i in range(0, count, batch_size):
         batch_count = min(batch_size, count - i)
-        values = []
+        values: list[tuple] = []
 
         for j in range(batch_count):
             product_id = max_product_id + i + j + 1
@@ -169,25 +184,38 @@ def generate_products(cursor, count=100000):
             created_date = "2024-01-01 00:00:00"
 
             values.append(
-                f"({product_id}, '{name}', '{description}', {price}, {cost_price}, {category_id}, '{sku}', {weight}, '10x10x5', 1, '{created_date}', '{created_date}')"
+                (
+                    product_id,
+                    name,
+                    description,
+                    price,
+                    cost_price,
+                    category_id,
+                    sku,
+                    weight,
+                    "10x10x5",
+                    1,
+                    created_date,
+                    created_date,
+                )
             )
 
-        sql = f"INSERT INTO products (product_id, name, description, price, cost_price, category_id, sku, weight, dimensions, is_active, created_date, updated_date) VALUES {','.join(values)}"
-        cursor.execute(sql)
+        sql = (
+            "INSERT INTO products (product_id, name, description, price, cost_price, category_id, sku, weight, dimensions, is_active, created_date, updated_date) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        )
+        cursor.executemany(sql, values)
 
         if (i + batch_size) % 10000 == 0:
             print(f"Generated {min(i + batch_size, count)} products...")
-            cursor.execute("COMMIT")  # Commit periodically
+            connection.commit()  # Commit periodically
 
-    cursor.execute("COMMIT")
-    cursor.execute("SET foreign_key_checks=1")
-    cursor.execute("SET unique_checks=1")
-    cursor.execute("SET autocommit=1")
+    connection.commit()
 
     print(f"Successfully generated {count} products using batch INSERT")
 
 
-def generate_inventory(cursor, count=100000):
+def generate_inventory(connection, cursor, count=100000):
     """Generate 100K inventory records"""
     print(f"Generating {count} inventory records...")
 
@@ -196,14 +224,22 @@ def generate_inventory(cursor, count=100000):
     max_inventory_id = cursor.fetchone()[0]
     print(f"Starting from inventory_id: {max_inventory_id + 1}")
 
+    # Determine valid product_id range to satisfy FK
+    min_product_id, max_product_id = get_id_range(cursor, "products", "product_id")
+    if min_product_id is None or max_product_id is None:
+        print("No products found; skipping inventory generation.")
+        return
+    assert isinstance(min_product_id, int) and isinstance(max_product_id, int)
+
     batch_size = 1000
     for i in range(0, count, batch_size):
         batch_count = min(batch_size, count - i)
-        values = []
+        values: list[tuple] = []
 
         for j in range(batch_count):
             inventory_id = max_inventory_id + i + j + 1
-            product_id = random.randint(1, 100000)
+            # Ensure valid FK
+            product_id = random.randint(min_product_id, max_product_id)
             warehouse_id = random.randint(1, 10)
             quantity = random.randint(0, 1000)
             min_quantity = random.randint(5, 50)
@@ -214,17 +250,30 @@ def generate_inventory(cursor, count=100000):
             product_price = generate_random_price()
 
             values.append(
-                f"({inventory_id}, {product_id}, {warehouse_id}, {quantity}, {min_quantity}, {max_quantity}, '{product_name}', {product_price}, NOW())"
+                (
+                    inventory_id,
+                    product_id,
+                    warehouse_id,
+                    quantity,
+                    min_quantity,
+                    max_quantity,
+                    product_name,
+                    product_price,
+                    datetime.now(),
+                )
             )
 
-        sql = f"INSERT INTO inventory (inventory_id, product_id, warehouse_id, quantity, min_quantity, max_quantity, product_name, product_price, last_updated) VALUES {','.join(values)}"
-        cursor.execute(sql)
+        sql = (
+            "INSERT INTO inventory (inventory_id, product_id, warehouse_id, quantity, min_quantity, max_quantity, product_name, product_price, last_updated) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        )
+        cursor.executemany(sql, values)
 
         if (i + batch_size) % 10000 == 0:
             print(f"Generated {i + batch_size} inventory records...")
 
 
-def generate_orders(cursor, count=5000000):
+def generate_orders(connection, cursor, count=5000000):
     """Generate 5M orders using batch INSERT statements"""
     print(f"Generating {count} orders...")
 
@@ -235,19 +284,22 @@ def generate_orders(cursor, count=5000000):
     statuses = ["pending", "shipped", "delivered"]
     payment_methods = ["credit_card", "paypal"]
 
-    # Optimize MySQL settings for bulk operations
-    cursor.execute("SET foreign_key_checks=0")
-    cursor.execute("SET unique_checks=0")
-    cursor.execute("SET autocommit=0")
+    # Determine valid user_id range for FK
+    min_user_id, max_user_id = get_id_range(cursor, "users", "user_id")
+    if min_user_id is None or max_user_id is None:
+        print("No users found; skipping orders generation.")
+        return
+    assert isinstance(min_user_id, int) and isinstance(max_user_id, int)
 
     batch_size = 1000  # Reasonable batch size for INSERT statements
     for i in range(0, count, batch_size):
         batch_count = min(batch_size, count - i)
-        values = []
+        values: list[tuple] = []
 
         for j in range(batch_count):
             order_id = max_order_id + i + j + 1
-            user_id = (order_id % 1000000) + 1
+            # Ensure valid FK to users
+            user_id = min_user_id + ((order_id - 1) % (max_user_id - min_user_id + 1))
             order_date = "2024-01-01"
             total_amount = round(10 + (order_id % 1990), 2)
             status = statuses[order_id % len(statuses)]
@@ -257,25 +309,36 @@ def generate_orders(cursor, count=5000000):
             tracking_number = f"TRK{order_id:08d}"
 
             values.append(
-                f"({order_id}, {user_id}, '{order_date}', {total_amount}, '{status}', '{shipping_address}', '{billing_address}', '{payment_method}', '{tracking_number}', NULL)"
+                (
+                    order_id,
+                    user_id,
+                    order_date,
+                    total_amount,
+                    status,
+                    shipping_address,
+                    billing_address,
+                    payment_method,
+                    tracking_number,
+                    None,
+                )
             )
 
-        sql = f"INSERT INTO orders (order_id, user_id, order_date, total_amount, status, shipping_address, billing_address, payment_method, tracking_number, notes) VALUES {','.join(values)}"
-        cursor.execute(sql)
+        sql = (
+            "INSERT INTO orders (order_id, user_id, order_date, total_amount, status, shipping_address, billing_address, payment_method, tracking_number, notes) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        )
+        cursor.executemany(sql, values)
 
         if (i + batch_size) % 100000 == 0:
             print(f"Generated {min(i + batch_size, count)} orders...")
-            cursor.execute("COMMIT")  # Commit periodically
+            connection.commit()  # Commit periodically
 
-    cursor.execute("COMMIT")
-    cursor.execute("SET foreign_key_checks=1")
-    cursor.execute("SET unique_checks=1")
-    cursor.execute("SET autocommit=1")
+    connection.commit()
 
     print(f"Successfully generated {count} orders using batch INSERT")
 
 
-def generate_order_items(cursor, count=15000000):
+def generate_order_items(connection, cursor, count=15000000):
     """Generate 15M order items using batch INSERT statements"""
     print(f"Generating {count} order items...")
 
@@ -283,20 +346,28 @@ def generate_order_items(cursor, count=15000000):
     max_item_id = cursor.fetchone()[0]
     print(f"Starting from item_id: {max_item_id + 1}")
 
-    # Optimize MySQL settings for bulk operations
-    cursor.execute("SET foreign_key_checks=0")
-    cursor.execute("SET unique_checks=0")
-    cursor.execute("SET autocommit=0")
+    # Determine valid ranges for FKs
+    min_order_id, max_order_id = get_id_range(cursor, "orders", "order_id")
+    min_product_id, max_product_id = get_id_range(cursor, "products", "product_id")
+    if None in (min_order_id, max_order_id, min_product_id, max_product_id):
+        print("Missing orders/products; skipping order_items generation.")
+        return
+    assert isinstance(min_order_id, int) and isinstance(max_order_id, int)
+    assert isinstance(min_product_id, int) and isinstance(max_product_id, int)
 
     batch_size = 1000  # Reasonable batch size for INSERT statements
     for i in range(0, count, batch_size):
         batch_count = min(batch_size, count - i)
-        values = []
+        values: list[tuple] = []
 
         for j in range(batch_count):
             item_id = max_item_id + i + j + 1
-            order_id = (item_id % 5000000) + 1
-            product_id = (item_id % 100000) + 1
+            order_id = min_order_id + (
+                (item_id - 1) % (max_order_id - min_order_id + 1)
+            )
+            product_id = min_product_id + (
+                (item_id - 1) % (max_product_id - min_product_id + 1)
+            )
             quantity = (item_id % 5) + 1
             unit_price = round(10 + (item_id % 190), 2)
             total_price = unit_price * quantity
@@ -304,25 +375,34 @@ def generate_order_items(cursor, count=15000000):
             created_at = "2024-01-01 00:00:00"
 
             values.append(
-                f"({item_id}, {order_id}, {product_id}, {quantity}, {unit_price}, {total_price}, '{product_name}', '{created_at}')"
+                (
+                    item_id,
+                    order_id,
+                    product_id,
+                    quantity,
+                    unit_price,
+                    total_price,
+                    product_name,
+                    created_at,
+                )
             )
 
-        sql = f"INSERT INTO order_items (item_id, order_id, product_id, quantity, unit_price, total_price, product_name, created_at) VALUES {','.join(values)}"
-        cursor.execute(sql)
+        sql = (
+            "INSERT INTO order_items (item_id, order_id, product_id, quantity, unit_price, total_price, product_name, created_at) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
+        )
+        cursor.executemany(sql, values)
 
         if (i + batch_size) % 500000 == 0:
             print(f"Generated {min(i + batch_size, count)} order items...")
-            cursor.execute("COMMIT")  # Commit periodically
+            connection.commit()  # Commit periodically
 
-    cursor.execute("COMMIT")
-    cursor.execute("SET foreign_key_checks=1")
-    cursor.execute("SET unique_checks=1")
-    cursor.execute("SET autocommit=1")
+    connection.commit()
 
     print(f"Successfully generated {count} order items using batch INSERT")
 
 
-def generate_reviews(cursor, count=2000000):
+def generate_reviews(connection, cursor, count=2000000):
     """Generate 2M reviews"""
     print(f"Generating {count} reviews...")
 
@@ -344,34 +424,55 @@ def generate_reviews(cursor, count=2000000):
         "Highly recommended",
     ]
 
+    min_product_id, max_product_id = get_id_range(cursor, "products", "product_id")
+    min_user_id, max_user_id = get_id_range(cursor, "users", "user_id")
+    if None in (min_product_id, max_product_id, min_user_id, max_user_id):
+        print("Missing users/products; skipping reviews generation.")
+        return
+    assert isinstance(min_product_id, int) and isinstance(max_product_id, int)
+    assert isinstance(min_user_id, int) and isinstance(max_user_id, int)
+
     batch_size = 1000
     for i in range(0, count, batch_size):
         batch_count = min(batch_size, count - i)
-        values = []
+        values: list[tuple] = []
 
         for j in range(batch_count):
             review_id = max_review_id + i + j + 1
-            product_id = random.randint(1, 100000)
-            user_id = random.randint(1, 1000000)
+            product_id = random.randint(min_product_id, max_product_id)
+            user_id = random.randint(min_user_id, max_user_id)
             rating = random.randint(1, 5)
             title = random.choice(titles)
             comment = f"This is a {rating}-star review for product {product_id}. {'Great product!' if rating >= 4 else 'Could be better.'}"
-            is_verified = random.choice([True, False])
+            is_verified = 1 if random.choice([True, False]) else 0
             created_date = datetime.now() - timedelta(days=random.randint(0, 365))
             helpful_votes = random.randint(0, 100)
 
             values.append(
-                f"({review_id}, {product_id}, {user_id}, {rating}, '{title}', '{comment}', {is_verified}, '{created_date}', {helpful_votes})"
+                (
+                    review_id,
+                    product_id,
+                    user_id,
+                    rating,
+                    title,
+                    comment,
+                    is_verified,
+                    created_date,
+                    helpful_votes,
+                )
             )
 
-        sql = f"INSERT INTO reviews (review_id, product_id, user_id, rating, title, comment, is_verified, created_date, helpful_votes) VALUES {','.join(values)}"
-        cursor.execute(sql)
+        sql = (
+            "INSERT INTO reviews (review_id, product_id, user_id, rating, title, comment, is_verified, created_date, helpful_votes) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        )
+        cursor.executemany(sql, values)
 
         if (i + batch_size) % 200000 == 0:
             print(f"Generated {i + batch_size} reviews...")
 
 
-def generate_payments(cursor, count=5000000):
+def generate_payments(connection, cursor, count=5000000):
     """Generate 5M payments"""
     print(f"Generating {count} payments...")
 
@@ -383,14 +484,20 @@ def generate_payments(cursor, count=5000000):
     payment_methods = ["credit_card", "paypal", "bank_transfer", "cash_on_delivery"]
     statuses = ["pending", "completed", "failed", "refunded", "cancelled"]
 
+    min_order_id, max_order_id = get_id_range(cursor, "orders", "order_id")
+    if None in (min_order_id, max_order_id):
+        print("No orders found; skipping payments generation.")
+        return
+    assert isinstance(min_order_id, int) and isinstance(max_order_id, int)
+
     batch_size = 1000
     for i in range(0, count, batch_size):
         batch_count = min(batch_size, count - i)
-        values = []
+        values: list[tuple] = []
 
         for j in range(batch_count):
             payment_id = max_payment_id + i + j + 1
-            order_id = random.randint(1, 5000000)
+            order_id = random.randint(min_order_id, max_order_id)
             amount = generate_random_price()
             payment_method = random.choice(payment_methods)
 
@@ -404,11 +511,25 @@ def generate_payments(cursor, count=5000000):
             created_at = datetime.now() - timedelta(days=random.randint(0, 365))
 
             values.append(
-                f"({payment_id}, {order_id}, {amount}, '{payment_method}', '{card_number}', '{card_expiry}', '{cvv}', '{transaction_id}', '{status}', '{created_at}')"
+                (
+                    payment_id,
+                    order_id,
+                    amount,
+                    payment_method,
+                    card_number,
+                    card_expiry,
+                    cvv,
+                    transaction_id,
+                    status,
+                    created_at,
+                )
             )
 
-        sql = f"INSERT INTO payments (payment_id, order_id, amount, payment_method, card_number, card_expiry, cvv, transaction_id, status, created_at) VALUES {','.join(values)}"
-        cursor.execute(sql)
+        sql = (
+            "INSERT INTO payments (payment_id, order_id, amount, payment_method, card_number, card_expiry, cvv, transaction_id, status, created_at) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        )
+        cursor.executemany(sql, values)
 
         if (i + batch_size) % 500000 == 0:
             print(f"Generated {i + batch_size} payments...")
@@ -438,7 +559,7 @@ def perform_transactions(cursor, count=1000000):
 
     queries = queries[:count]
 
-    cursor.execute("SET autocommit=1")  # Auto-commit for speed
+    # Keep autocommit off; trivial queries don't modify state
 
     # Execute in larger batches
     batch_size = 10000
@@ -465,7 +586,12 @@ def main():
 
     try:
         # Use connection pool for better performance
-        pool = mysql.connector.pooling.MySQLConnectionPool(**DB_CONFIG)
+        pool = mysql.connector.pooling.MySQLConnectionPool(
+            pool_name="test_data_pool",
+            pool_size=10,
+            pool_reset_session=True,
+            **CONNECTION_CONFIG,
+        )
         connection = pool.get_connection()
         cursor = connection.cursor()
 
@@ -507,7 +633,7 @@ def main():
         )
         print(f"Using {cpu_count()} CPU cores for parallel processing")
 
-        # Generate 28M+ rows ultra-fast - optimized order for foreign key dependencies
+        # Generate rows - order matters for foreign key dependencies
         print("\n🚀 Starting ultra-fast data generation...")
 
         # Set a scaling factor for easy adjustment of data volume
@@ -515,20 +641,20 @@ def main():
 
         # Phase 1: Base entities (parallel where possible)
         print("\n📊 Phase 1: Generating base entities...")
-        generate_users(cursor, int(100_000 * FACTOR))
-        generate_products(cursor, int(100_000 * FACTOR))
+        generate_users(connection, cursor, int(100_000 * FACTOR))
+        generate_products(connection, cursor, int(100_000 * FACTOR))
 
         # Phase 2: Dependent entities (can be done in parallel)
         print("\n📊 Phase 2: Generating dependent entities...")
-        generate_orders(cursor, int(500_000 * FACTOR))
-        generate_order_items(cursor, int(1_500_000 * FACTOR))
+        generate_orders(connection, cursor, int(500_000 * FACTOR))
+        generate_order_items(connection, cursor, int(1_500_000 * FACTOR))
 
         # Phase 3: Additional entities (small tables, can be fast)
         print("\n📊 Phase 3: Generating additional entities...")
         # Skip inventory, reviews, payments for maximum speed - focus on core tables
-        generate_inventory(cursor, int(100_000 * FACTOR))
-        generate_reviews(cursor, int(200_000 * FACTOR))
-        generate_payments(cursor, int(500_000 * FACTOR))
+        generate_inventory(connection, cursor, int(100_000 * FACTOR))
+        generate_reviews(connection, cursor, int(200_000 * FACTOR))
+        generate_payments(connection, cursor, int(500_000 * FACTOR))
 
         # Commit all data
         connection.commit()
@@ -576,9 +702,10 @@ def main():
         connection.close()
 
         print("\n✅ Ultra-fast test data generation completed successfully!")
-        print("\n🛡️ Database contains intentional bad practices for MCP testing:")
+        print(
+            "\n🛡️ Database contains intentional bad practices for MCP testing (now with FKs):"
+        )
         print("  • Plain text passwords and credit card numbers")
-        print("  • Missing foreign key constraints")
         print("  • Redundant data in tables")
         print("  • No proper indexes on frequently queried columns")
         print("  • Overly permissive user privileges")
