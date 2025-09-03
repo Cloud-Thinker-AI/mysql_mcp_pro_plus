@@ -637,7 +637,7 @@ def main():
         print("\n🚀 Starting ultra-fast data generation...")
 
         # Set a scaling factor for easy adjustment of data volume
-        FACTOR = 0.1
+        FACTOR = 0.01
 
         # Phase 1: Base entities (parallel where possible)
         print("\n📊 Phase 1: Generating base entities...")

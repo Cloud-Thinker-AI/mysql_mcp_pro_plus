@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from ..logger import logger
 
@@ -131,13 +131,13 @@ class DatabaseHealthAnalyzer:
         try:
             # Get connection statistics
             connection_stats_query = """
-            SELECT 
+            SELECT
                 VARIABLE_NAME,
                 VARIABLE_VALUE
-            FROM performance_schema.global_status 
+            FROM performance_schema.global_status
             WHERE VARIABLE_NAME IN (
                 'Threads_connected',
-                'Threads_running', 
+                'Threads_running',
                 'Threads_created',
                 'Threads_cached',
                 'Aborted_connections',
@@ -148,10 +148,10 @@ class DatabaseHealthAnalyzer:
             """
 
             connection_vars_query = """
-            SELECT 
+            SELECT
                 VARIABLE_NAME,
                 VARIABLE_VALUE
-            FROM performance_schema.global_variables 
+            FROM performance_schema.global_variables
             WHERE VARIABLE_NAME IN (
                 'max_connections',
                 'thread_cache_size',
@@ -272,7 +272,7 @@ class DatabaseHealthAnalyzer:
         try:
             # Get index usage statistics
             index_usage_query = """
-            SELECT 
+            SELECT
                 OBJECT_SCHEMA as database_name,
                 OBJECT_NAME as table_name,
                 INDEX_NAME,
@@ -280,14 +280,14 @@ class DatabaseHealthAnalyzer:
                 COUNT_INSERT,
                 COUNT_UPDATE,
                 COUNT_DELETE
-            FROM performance_schema.table_io_waits_summary_by_index_usage 
+            FROM performance_schema.table_io_waits_summary_by_index_usage
             WHERE OBJECT_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')
             ORDER BY COUNT_FETCH DESC
             """
 
             # Get index information
             index_info_query = """
-            SELECT 
+            SELECT
                 TABLE_SCHEMA as database_name,
                 TABLE_NAME,
                 INDEX_NAME,
@@ -295,20 +295,20 @@ class DatabaseHealthAnalyzer:
                 COLUMN_NAME,
                 CARDINALITY,
                 INDEX_TYPE
-            FROM information_schema.STATISTICS 
+            FROM information_schema.STATISTICS
             WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')
             ORDER BY TABLE_SCHEMA, TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX
             """
 
             # Get table sizes for context
             table_size_query = """
-            SELECT 
+            SELECT
                 TABLE_SCHEMA as database_name,
                 TABLE_NAME,
                 TABLE_ROWS,
                 DATA_LENGTH,
                 INDEX_LENGTH
-            FROM information_schema.TABLES 
+            FROM information_schema.TABLES
             WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')
                 AND TABLE_TYPE = 'BASE TABLE'
             """
@@ -465,10 +465,10 @@ class DatabaseHealthAnalyzer:
         try:
             # Get buffer pool statistics
             buffer_pool_query = """
-            SELECT 
+            SELECT
                 VARIABLE_NAME,
                 VARIABLE_VALUE
-            FROM performance_schema.global_status 
+            FROM performance_schema.global_status
             WHERE VARIABLE_NAME IN (
                 'Innodb_buffer_pool_size',
                 'Innodb_buffer_pool_pages_total',
@@ -484,10 +484,10 @@ class DatabaseHealthAnalyzer:
 
             # Get buffer pool configuration
             buffer_pool_vars_query = """
-            SELECT 
+            SELECT
                 VARIABLE_NAME,
                 VARIABLE_VALUE
-            FROM performance_schema.global_variables 
+            FROM performance_schema.global_variables
             WHERE VARIABLE_NAME IN (
                 'innodb_buffer_pool_size',
                 'innodb_buffer_pool_instances',
@@ -685,11 +685,11 @@ class DatabaseHealthAnalyzer:
             if replication_data["is_master"]:
                 try:
                     binlog_vars_query = """
-                    SELECT VARIABLE_NAME, VARIABLE_VALUE 
-                    FROM performance_schema.global_variables 
+                    SELECT VARIABLE_NAME, VARIABLE_VALUE
+                    FROM performance_schema.global_variables
                     WHERE VARIABLE_NAME IN (
                         'log_bin',
-                        'sync_binlog', 
+                        'sync_binlog',
                         'binlog_format',
                         'expire_logs_days',
                         'binlog_cache_size'
@@ -743,7 +743,7 @@ class DatabaseHealthAnalyzer:
         try:
             # Get foreign key constraints
             fk_query = """
-            SELECT 
+            SELECT
                 kcu.CONSTRAINT_SCHEMA,
                 kcu.CONSTRAINT_NAME,
                 kcu.TABLE_NAME,
@@ -754,8 +754,8 @@ class DatabaseHealthAnalyzer:
                 rc.UPDATE_RULE,
                 rc.DELETE_RULE
             FROM information_schema.KEY_COLUMN_USAGE kcu
-            LEFT JOIN information_schema.REFERENTIAL_CONSTRAINTS rc 
-                ON kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA 
+            LEFT JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
+                ON kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
                 AND kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
             WHERE kcu.REFERENCED_TABLE_NAME IS NOT NULL
                 AND kcu.CONSTRAINT_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')
@@ -764,7 +764,7 @@ class DatabaseHealthAnalyzer:
 
             # Get check constraints (MySQL 8.0+)
             check_constraints_query = """
-            SELECT 
+            SELECT
                 CONSTRAINT_SCHEMA,
                 CONSTRAINT_NAME,
                 TABLE_NAME,
@@ -821,7 +821,7 @@ class DatabaseHealthAnalyzer:
                     FROM `{fk["schema"]}`.`{fk["table"]}` child
                     LEFT JOIN `{fk["referenced_schema"]}`.`{fk["referenced_table"]}` parent
                         ON child.`{fk["column"]}` = parent.`{fk["referenced_column"]}`
-                    WHERE child.`{fk["column"]}` IS NOT NULL 
+                    WHERE child.`{fk["column"]}` IS NOT NULL
                         AND parent.`{fk["referenced_column"]}` IS NULL
                     """
                     orphan_result = await self.db_manager.execute_query(orphan_query)
@@ -881,7 +881,7 @@ class DatabaseHealthAnalyzer:
         try:
             # Get auto-increment information
             auto_inc_query = """
-            SELECT 
+            SELECT
                 t.TABLE_SCHEMA,
                 t.TABLE_NAME,
                 c.COLUMN_NAME,
@@ -889,8 +889,8 @@ class DatabaseHealthAnalyzer:
                 c.COLUMN_TYPE,
                 t.AUTO_INCREMENT
             FROM information_schema.TABLES t
-            JOIN information_schema.COLUMNS c 
-                ON t.TABLE_SCHEMA = c.TABLE_SCHEMA 
+            JOIN information_schema.COLUMNS c
+                ON t.TABLE_SCHEMA = c.TABLE_SCHEMA
                 AND t.TABLE_NAME = c.TABLE_NAME
             WHERE c.EXTRA = 'auto_increment'
                 AND t.TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')
@@ -1008,7 +1008,7 @@ class DatabaseHealthAnalyzer:
         try:
             # Get table fragmentation information
             fragmentation_query = """
-            SELECT 
+            SELECT
                 TABLE_SCHEMA,
                 TABLE_NAME,
                 ENGINE,
@@ -1016,12 +1016,12 @@ class DatabaseHealthAnalyzer:
                 COALESCE(DATA_LENGTH, 0) as DATA_LENGTH,
                 COALESCE(INDEX_LENGTH, 0) as INDEX_LENGTH,
                 COALESCE(DATA_FREE, 0) as DATA_FREE,
-                CASE 
-                    WHEN (DATA_LENGTH + INDEX_LENGTH + DATA_FREE) > 0 
+                CASE
+                    WHEN (DATA_LENGTH + INDEX_LENGTH + DATA_FREE) > 0
                     THEN ROUND((DATA_FREE / (DATA_LENGTH + INDEX_LENGTH + DATA_FREE)) * 100, 2)
                     ELSE 0
                 END as fragmentation_percent
-            FROM information_schema.TABLES 
+            FROM information_schema.TABLES
             WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')
                 AND TABLE_TYPE = 'BASE TABLE'
                 AND ENGINE = 'InnoDB'
@@ -1137,13 +1137,13 @@ class DatabaseHealthAnalyzer:
         try:
             # Get performance-related status variables
             perf_query = """
-            SELECT 
+            SELECT
                 VARIABLE_NAME,
                 VARIABLE_VALUE
-            FROM performance_schema.global_status 
+            FROM performance_schema.global_status
             WHERE VARIABLE_NAME IN (
                 'Qcache_hits',
-                'Qcache_inserts', 
+                'Qcache_inserts',
                 'Qcache_not_cached',
                 'Slow_queries',
                 'Questions',
@@ -1297,7 +1297,7 @@ class DatabaseHealthAnalyzer:
         try:
             # Get storage engine information
             engines_query = """
-            SELECT 
+            SELECT
                 ENGINE,
                 SUPPORT,
                 COMMENT
@@ -1306,11 +1306,11 @@ class DatabaseHealthAnalyzer:
 
             # Get table distribution by engine
             table_engines_query = """
-            SELECT 
+            SELECT
                 COALESCE(ENGINE, 'Unknown') as ENGINE,
                 COUNT(*) as table_count,
                 ROUND(SUM(COALESCE(DATA_LENGTH, 0) + COALESCE(INDEX_LENGTH, 0)) / 1024 / 1024, 2) as size_mb
-            FROM information_schema.TABLES 
+            FROM information_schema.TABLES
             WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')
                 AND TABLE_TYPE = 'BASE TABLE'
                 AND ENGINE IS NOT NULL
@@ -1413,7 +1413,7 @@ class DatabaseHealthAnalyzer:
         try:
             # Get user account information
             users_query = """
-            SELECT 
+            SELECT
                 User,
                 Host,
                 account_locked,
@@ -1427,10 +1427,10 @@ class DatabaseHealthAnalyzer:
 
             # Get SSL status
             ssl_query = """
-            SELECT 
+            SELECT
                 VARIABLE_NAME,
                 VARIABLE_VALUE
-            FROM performance_schema.global_variables 
+            FROM performance_schema.global_variables
             WHERE VARIABLE_NAME IN (
                 'have_ssl',
                 'ssl_cert',
@@ -1441,10 +1441,10 @@ class DatabaseHealthAnalyzer:
 
             # Get security-related configuration
             security_vars_query = """
-            SELECT 
+            SELECT
                 VARIABLE_NAME,
                 VARIABLE_VALUE
-            FROM performance_schema.global_variables 
+            FROM performance_schema.global_variables
             WHERE VARIABLE_NAME IN (
                 'validate_password_policy',
                 'validate_password_length',
@@ -1585,57 +1585,47 @@ class DatabaseHealthAnalyzer:
         return result
 
     def _format_as_text(self, result: Dict[str, Any]) -> str:
-        """Format the analysis result as readable text."""
+        """Format the analysis result as agent-readable text."""
         lines = []
 
         # Header
-        lines.append("=" * 80)
-        lines.append("🏥 MYSQL DATABASE HEALTH ANALYSIS REPORT")
-        lines.append("=" * 80)
-        lines.append(f"📅 Analysis Time: {result['timestamp']}")
-        lines.append(f"⏱️  Duration: {result['analysis_duration_seconds']:.2f} seconds")
-        lines.append(f"🎯 Overall Health Score: {result['health_score']}/100")
+        lines.append("MYSQL DATABASE HEALTH ANALYSIS REPORT")
+        lines.append(f"Analysis Time: {result['timestamp']}")
+        lines.append(f"Duration: {result['analysis_duration_seconds']:.2f} seconds")
+        lines.append(f"Overall Health Score: {result['health_score']}/100")
         lines.append("")
 
         # Health Status Summary
         if result["health_score"] >= 90:
-            status_emoji = "✅"
             status_text = "EXCELLENT"
         elif result["health_score"] >= 75:
-            status_emoji = "🟢"
             status_text = "GOOD"
         elif result["health_score"] >= 60:
-            status_emoji = "🟡"
             status_text = "FAIR"
         elif result["health_score"] >= 40:
-            status_emoji = "🟠"
             status_text = "POOR"
         else:
-            status_emoji = "🔴"
             status_text = "CRITICAL"
 
-        lines.append(f"{status_emoji} Overall Status: {status_text}")
+        lines.append(f"Overall Status: {status_text}")
         lines.append("")
 
         # Critical Issues
         if result["critical_issues"]:
-            lines.append("🚨 CRITICAL ISSUES:")
-            lines.append("-" * 50)
+            lines.append("CRITICAL ISSUES:")
             for issue in result["critical_issues"]:
-                lines.append(f"  • {issue}")
+                lines.append(f"  - {issue}")
             lines.append("")
 
         # Warnings
         if result["warnings"]:
-            lines.append("⚠️  WARNINGS:")
-            lines.append("-" * 50)
+            lines.append("WARNINGS:")
             for warning in result["warnings"]:
-                lines.append(f"  • {warning}")
+                lines.append(f"  - {warning}")
             lines.append("")
 
         # Section Details
-        lines.append("📊 DETAILED ANALYSIS:")
-        lines.append("=" * 50)
+        lines.append("DETAILED ANALYSIS:")
 
         for section_name, section_data in result["sections"].items():
             if not isinstance(section_data, dict):
@@ -1645,11 +1635,10 @@ class DatabaseHealthAnalyzer:
             score = result["section_scores"].get(section_name, 0)
             status = section_data.get("status", "unknown")
 
-            lines.append(f"\n🔍 {section_title} (Score: {score}/100)")
-            lines.append("-" * 40)
+            lines.append(f"\n{section_title} (Score: {score}/100)")
 
             if status == "error":
-                lines.append(f"❌ Error: {section_data.get('error', 'Unknown error')}")
+                lines.append(f"Error: {section_data.get('error', 'Unknown error')}")
                 continue
 
             # Section-specific formatting
@@ -1696,14 +1685,14 @@ class DatabaseHealthAnalyzer:
 
             elif section_name == "replication":
                 if section_data.get("is_slave"):
-                    lines.append(f"  Role: Slave")
+                    lines.append("  Role: Slave")
                     lines.append(
                         f"  Lag: {section_data.get('slave_lag_seconds', 0)} seconds"
                     )
                 elif section_data.get("is_master"):
-                    lines.append(f"  Role: Master")
+                    lines.append("  Role: Master")
                 else:
-                    lines.append(f"  Role: Standalone (no replication)")
+                    lines.append("  Role: Standalone (no replication)")
 
             elif section_name == "auto_increment":
                 sequences = section_data.get("sequences", [])
@@ -1712,7 +1701,7 @@ class DatabaseHealthAnalyzer:
                 lines.append(f"  Near Exhaustion: {len(near_exhaustion)}")
                 for seq in near_exhaustion[:3]:  # Show top 3
                     lines.append(
-                        f"    • {seq['schema']}.{seq['table']}.{seq['column']}: {seq['usage_percent']}%"
+                        f"    - {seq['schema']}.{seq['table']}.{seq['column']}: {seq['usage_percent']}%"
                     )
 
             elif section_name == "fragmentation":
@@ -1728,57 +1717,54 @@ class DatabaseHealthAnalyzer:
 
         # Recommendations
         if result["recommendations"]:
-            lines.append("\n💡 RECOMMENDATIONS:")
-            lines.append("=" * 50)
+            lines.append("\nRECOMMENDATIONS:")
             for i, rec in enumerate(
                 result["recommendations"][:10], 1
             ):  # Top 10 recommendations
                 lines.append(f"{i:2}. {rec}")
 
-        lines.append("\n" + "=" * 80)
-        lines.append("End of Health Analysis Report")
-        lines.append("=" * 80)
+        lines.append("\nEnd of Health Analysis Report")
 
         return "\n".join(lines)
 
     def _format_timeout_result(self, timeout: int) -> str:
         """Format timeout result."""
         return f"""
-🏥 MySQL Database Health Analysis - TIMEOUT
+MySQL Database Health Analysis - TIMEOUT
 
-⚠️ Analysis timed out after {timeout} seconds.
+Analysis timed out after {timeout} seconds.
 
 This may indicate:
-• Database is under heavy load
-• Complex queries taking too long
-• Network connectivity issues
-• Large dataset requiring more time
+- Database is under heavy load
+- Complex queries taking too long
+- Network connectivity issues
+- Large dataset requiring more time
 
 Recommendations:
-• Try again during off-peak hours
-• Increase timeout value
-• Check database performance
-• Review current database load
+- Try again during off-peak hours
+- Increase timeout value
+- Check database performance
+- Review current database load
 """
 
     def _format_error_result(self, error: str) -> str:
         """Format error result."""
         return f"""
-🏥 MySQL Database Health Analysis - ERROR
+MySQL Database Health Analysis - ERROR
 
-❌ Analysis failed with error: {error}
+Analysis failed with error: {error}
 
 This may indicate:
-• Insufficient database privileges
-• Database connectivity issues
-• Unsupported MySQL version
-• Configuration problems
+- Insufficient database privileges
+- Database connectivity issues
+- Unsupported MySQL version
+- Configuration problems
 
 Recommendations:
-• Check database connection
-• Verify user privileges
-• Review MySQL version compatibility
-• Check error logs for details
+- Check database connection
+- Verify user privileges
+- Review MySQL version compatibility
+- Check error logs for details
 """
 
 

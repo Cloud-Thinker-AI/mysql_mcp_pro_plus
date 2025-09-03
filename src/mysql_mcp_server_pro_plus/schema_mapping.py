@@ -66,14 +66,14 @@ class SchemaMappingTool:
                 GROUP_CONCAT(kcu.REFERENCED_COLUMN_NAME ORDER BY kcu.ORDINAL_POSITION) as to_columns,
                 tc.CONSTRAINT_NAME
             FROM information_schema.TABLE_CONSTRAINTS tc
-            JOIN information_schema.KEY_COLUMN_USAGE kcu 
-                ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME 
+            JOIN information_schema.KEY_COLUMN_USAGE kcu
+                ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
                 AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
             WHERE tc.CONSTRAINT_TYPE = 'FOREIGN KEY'
                 AND tc.CONSTRAINT_SCHEMA IN ({})
                 AND kcu.REFERENCED_TABLE_SCHEMA IS NOT NULL
                 AND tc.CONSTRAINT_SCHEMA != kcu.REFERENCED_TABLE_SCHEMA
-            GROUP BY tc.CONSTRAINT_SCHEMA, tc.TABLE_NAME, kcu.REFERENCED_TABLE_SCHEMA, 
+            GROUP BY tc.CONSTRAINT_SCHEMA, tc.TABLE_NAME, kcu.REFERENCED_TABLE_SCHEMA,
                      kcu.REFERENCED_TABLE_NAME, tc.CONSTRAINT_NAME
             ORDER BY tc.CONSTRAINT_SCHEMA, tc.TABLE_NAME
         """.format(",".join([f"'{schema}'" for schema in schemas]))
@@ -155,34 +155,33 @@ class SchemaMappingTool:
         relationships: List[Dict[str, Any]],
         connectivity: Dict[str, Any],
     ) -> str:
-        """Format schema analysis as human-readable text."""
+        """Format schema analysis as agent-readable text."""
         output = []
 
-        output.append("🔗 SCHEMA RELATIONSHIP ANALYSIS")
-        output.append("=" * 40)
+        output.append("SCHEMA RELATIONSHIP ANALYSIS")
         output.append(f"Analyzed Schemas: {len(schemas)}")
         output.append(f"Cross-Schema Relationships: {len(relationships)}")
         output.append("")
 
         # Schema connectivity summary
         if connectivity["schema_connections"]:
-            output.append("📊 Schema Connectivity:")
+            output.append("Schema Connectivity:")
             for schema, conn in connectivity["schema_connections"].items():
                 if conn["total"] > 0:
                     output.append(
-                        f"  • {schema}: {conn['total']} connections "
+                        f"  - {schema}: {conn['total']} connections "
                         f"({conn['outgoing']} outgoing, {conn['incoming']} incoming)"
                     )
             output.append("")
 
         # Cross-schema relationships details
         if relationships:
-            output.append("🔗 Cross-Schema Foreign Key Relationships:")
+            output.append("Cross-Schema Foreign Key Relationships:")
             for rel in relationships[:10]:  # Limit to top 10
                 from_cols = ", ".join(rel["from_columns"])
                 to_cols = ", ".join(rel["to_columns"])
                 output.append(
-                    f"  • {rel['from_schema']}.{rel['from_table']}({from_cols}) → "
+                    f"  - {rel['from_schema']}.{rel['from_table']}({from_cols}) -> "
                     f"{rel['to_schema']}.{rel['to_table']}({to_cols})"
                 )
             if len(relationships) > 10:
@@ -191,20 +190,20 @@ class SchemaMappingTool:
 
         # Hub schemas
         if connectivity["hub_schemas"]:
-            output.append("🎯 Most Connected Schemas:")
+            output.append("Most Connected Schemas:")
             for hub in connectivity["hub_schemas"][:5]:
-                output.append(f"  • {hub['schema']}: {hub['connections']} connections")
+                output.append(f"  - {hub['schema']}: {hub['connections']} connections")
             output.append("")
 
         # Isolated schemas
         if connectivity["isolated_schemas"]:
-            output.append("🏝️  Isolated Schemas (No Cross-Schema Relationships):")
+            output.append("Isolated Schemas (No Cross-Schema Relationships):")
             for schema in connectivity["isolated_schemas"]:
-                output.append(f"  • {schema}")
+                output.append(f"  - {schema}")
             output.append("")
 
         # Insights
-        output.append("💡 Schema Architecture Insights:")
+        output.append("Schema Architecture Insights:")
         total_schemas = len(schemas)
         connected_schemas = total_schemas - len(connectivity["isolated_schemas"])
 
@@ -212,26 +211,26 @@ class SchemaMappingTool:
             isolation_pct = (
                 len(connectivity["isolated_schemas"]) / total_schemas
             ) * 100
-            output.append(f"  • {isolation_pct:.1f}% of schemas are isolated")
+            output.append(f"  - {isolation_pct:.1f}% of schemas are isolated")
 
         if connectivity["hub_schemas"]:
             hub_schema = connectivity["hub_schemas"][0]["schema"]
             hub_connections = connectivity["hub_schemas"][0]["connections"]
             output.append(
-                f"  • '{hub_schema}' is the most connected schema ({hub_connections} connections)"
+                f"  - '{hub_schema}' is the most connected schema ({hub_connections} connections)"
             )
 
         if len(relationships) == 0:
             output.append(
-                "  • No cross-schema relationships found - schemas are independent"
+                "  - No cross-schema relationships found - schemas are independent"
             )
         elif connected_schemas == total_schemas:
             output.append(
-                "  • All schemas are interconnected through foreign key relationships"
+                "  - All schemas are interconnected through foreign key relationships"
             )
         else:
             output.append(
-                f"  • {connected_schemas}/{total_schemas} schemas are connected"
+                f"  - {connected_schemas}/{total_schemas} schemas are connected"
             )
 
         return "\n".join(output)

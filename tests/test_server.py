@@ -160,25 +160,28 @@ class TestSecurityValidator:
             SecurityValidator.validate_query("   ")
 
     def test_validate_query_dangerous_keywords(self):
-        """Test validating query with dangerous keywords (should log warning but allow)."""
+        """Test validating query with dangerous keywords (should block with error)."""
         dangerous_queries = [
-            "DROP TABLE users",
-            "DELETE FROM users",
-            "TRUNCATE TABLE users",
-            "ALTER TABLE users ADD COLUMN test INT",
-            "CREATE TABLE test (id INT)",
-            "INSERT INTO users VALUES (1, 'test')",
-            "UPDATE users SET name = 'test'",
-            "GRANT ALL ON *.* TO 'user'@'localhost'",
-            "REVOKE ALL ON *.* FROM 'user'@'localhost'",
-            "EXECUTE stmt",
-            "PREPARE stmt FROM 'SELECT * FROM users'",
+            ("DROP TABLE users", "DROP"),
+            ("DELETE FROM users", "DELETE"),
+            ("TRUNCATE TABLE users", "TRUNCATE"),
+            ("ALTER TABLE users ADD COLUMN test INT", "ALTER"),
+            ("CREATE TABLE test (id INT)", "CREATE"),
+            ("INSERT INTO users VALUES (1, 'test')", "INSERT"),
+            ("UPDATE users SET name = 'test'", "UPDATE"),
+            ("GRANT ALL ON *.* TO 'user'@'localhost'", "GRANT"),
+            ("REVOKE ALL ON *.* FROM 'user'@'localhost'", "REVOKE"),
+            ("EXECUTE stmt", "EXECUTE"),
+            ("PREPARE stmt FROM 'SELECT * FROM users'", "PREPARE"),
         ]
 
-        for query in dangerous_queries:
-            # Should not raise exception, but log warning
-            result = SecurityValidator.validate_query(query)
-            assert result == query
+        for query, keyword in dangerous_queries:
+            # Should raise ValueError with blocked message
+            with pytest.raises(
+                ValueError,
+                match=f"Blocked potentially dangerous SQL operation: {keyword}",
+            ):
+                SecurityValidator.validate_query(query)
 
 
 class TestDatabaseManager:

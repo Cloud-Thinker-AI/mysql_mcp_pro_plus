@@ -195,7 +195,7 @@ class DatabaseOverviewTool:
         try:
             # Get database size and connection info
             db_stats_query = """
-                SELECT 
+                SELECT
                     ROUND(SUM(data_length + index_length), 0) as database_size_bytes,
                     (SELECT VARIABLE_VALUE FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'Threads_connected') as active_connections,
                     (SELECT VARIABLE_VALUE FROM information_schema.GLOBAL_VARIABLES WHERE VARIABLE_NAME = 'max_connections') as max_connections
@@ -597,7 +597,7 @@ class DatabaseOverviewTool:
         # Get user security summary
         try:
             users_query = """
-                SELECT 
+                SELECT
                     COUNT(*) as total_users,
                     SUM(CASE WHEN Super_priv = 'Y' THEN 1 ELSE 0 END) as superusers,
                     SUM(CASE WHEN max_connections = 0 THEN 1 ELSE 0 END) as unlimited_connections
@@ -870,15 +870,14 @@ class DatabaseOverviewTool:
             }
 
     def _format_as_text(self, result: Dict[str, Any]) -> str:
-        """Format database overview result as human-readable text."""
+        """Format database overview result as agent-readable text."""
         if "error" in result:
-            return f"❌ Error: {result['error']}\n\nExecution metadata:\n{self._format_execution_metadata(result.get('execution_metadata', {}))}"
+            return f"Error: {result['error']}\n\nExecution metadata:\n{self._format_execution_metadata(result.get('execution_metadata', {}))}"
 
         output = []
 
         # Database Summary
-        output.append("📊 DATABASE OVERVIEW")
-        output.append("=" * 50)
+        output.append("DATABASE OVERVIEW")
 
         db_summary = result.get("database_summary", {})
         output.append(f"Total Schemas: {db_summary.get('total_schemas', 0)}")
@@ -892,8 +891,7 @@ class DatabaseOverviewTool:
         # Performance Overview
         perf_overview = result.get("performance_overview", {})
         if perf_overview:
-            output.append("⚡ PERFORMANCE OVERVIEW")
-            output.append("-" * 30)
+            output.append("PERFORMANCE OVERVIEW")
             output.append(
                 f"Active Connections: {perf_overview.get('active_connections', 0)}"
             )
@@ -905,14 +903,14 @@ class DatabaseOverviewTool:
             # Top tables
             top_tables = perf_overview.get("top_tables", {})
             if top_tables.get("largest"):
-                output.append("\n🔝 Largest Tables:")
+                output.append("\nLargest Tables:")
                 for i, table in enumerate(top_tables["largest"], 1):
                     output.append(
                         f"  {i}. {table['schema']}.{table['table']} - {table['size_readable']}"
                     )
 
             if top_tables.get("most_rows"):
-                output.append("\n📊 Tables with Most Rows:")
+                output.append("\nTables with Most Rows:")
                 for i, table in enumerate(top_tables["most_rows"], 1):
                     output.append(
                         f"  {i}. {table['schema']}.{table['table']} - {table['row_count']:,} rows"
@@ -922,8 +920,7 @@ class DatabaseOverviewTool:
         # Security Overview
         security_overview = result.get("security_overview", {})
         if security_overview:
-            output.append("🔒 SECURITY OVERVIEW")
-            output.append("-" * 30)
+            output.append("SECURITY OVERVIEW")
             output.append(
                 f"Security Score: {security_overview.get('security_score', 0)}/100"
             )
@@ -932,48 +929,47 @@ class DatabaseOverviewTool:
 
             security_issues = security_overview.get("security_issues", [])
             if security_issues:
-                output.append(f"\n⚠️  Security Issues ({len(security_issues)}):")
+                output.append(f"\nSecurity Issues ({len(security_issues)}):")
                 for issue in security_issues:
-                    output.append(f"  • {issue}")
+                    output.append(f"  - {issue}")
 
             recommendations = security_overview.get("recommendations", [])
             if recommendations:
-                output.append("\n💡 Recommendations:")
+                output.append("\nRecommendations:")
                 for rec in recommendations:
-                    output.append(f"  • {rec}")
+                    output.append(f"  - {rec}")
             output.append("")
 
         # Performance Hotspots
         hotspots = result.get("performance_hotspots", {})
         if hotspots and "error" not in hotspots:
             summary = hotspots.get("summary", {})
-            output.append("🔥 PERFORMANCE HOTSPOTS")
-            output.append("-" * 30)
+            output.append("PERFORMANCE HOTSPOTS")
             output.append(f"Total Hotspots: {summary.get('total_hotspots', 0)}")
             output.append(f"Critical Issues: {summary.get('critical_issues', 0)}")
             output.append(f"Warning Issues: {summary.get('warning_issues', 0)}")
 
             # Large tables
             if hotspots.get("large_tables"):
-                output.append("\n📏 Large Tables:")
+                output.append("\nLarge Tables:")
                 for table in hotspots["large_tables"][:5]:
                     output.append(
-                        f"  • {table['qualified_name']} - {table['size_mb']} MB ({table['severity']})"
+                        f"  - {table['qualified_name']} - {table['size_mb']} MB ({table['severity']})"
                     )
 
             # Empty tables
             if hotspots.get("empty_tables"):
-                output.append("\n📭 Empty Tables:")
+                output.append("\nEmpty Tables:")
                 for table in hotspots["empty_tables"][:5]:
-                    output.append(f"  • {table['qualified_name']}")
+                    output.append(f"  - {table['qualified_name']}")
 
             # Tables needing review
             if hotspots.get("tables_needing_review"):
-                output.append("\n🔧 Tables Needing Review:")
+                output.append("\nTables Needing Review:")
                 for table in hotspots["tables_needing_review"][:5]:
                     issues = ", ".join(table["issues"])
                     output.append(
-                        f"  • {table['qualified_name']} - {issues} ({table['severity']})"
+                        f"  - {table['qualified_name']} - {issues} ({table['severity']})"
                     )
             output.append("")
 
@@ -981,8 +977,7 @@ class DatabaseOverviewTool:
         relationships = result.get("relationships", {})
         if relationships:
             rel_summary = relationships.get("relationship_summary", {})
-            output.append("🔗 RELATIONSHIPS SUMMARY")
-            output.append("-" * 30)
+            output.append("RELATIONSHIPS SUMMARY")
             output.append(
                 f"Total Relationships: {rel_summary.get('total_relationships', 0)}"
             )
@@ -992,36 +987,35 @@ class DatabaseOverviewTool:
             # Most connected tables
             most_connected = rel_summary.get("most_connected_tables", [])
             if most_connected:
-                output.append("\n🌐 Most Connected Tables:")
+                output.append("\nMost Connected Tables:")
                 for table in most_connected[:5]:
                     output.append(
-                        f"  • {table['table']} - {table['connections']} connections"
+                        f"  - {table['table']} - {table['connections']} connections"
                     )
 
             # Hub tables
             hub_tables = rel_summary.get("hub_tables", [])
             if hub_tables:
-                output.append("\n🎯 Hub Tables (Most Referenced):")
+                output.append("\nHub Tables (Most Referenced):")
                 for table in hub_tables[:5]:
                     output.append(
-                        f"  • {table['table']} - referenced by {table['referenced_by']} tables"
+                        f"  - {table['table']} - referenced by {table['referenced_by']} tables"
                     )
 
             # Insights
             insights = rel_summary.get("relationship_insights", [])
             if insights:
-                output.append("\n💡 Relationship Insights:")
+                output.append("\nRelationship Insights:")
                 for insight in insights:
-                    output.append(f"  • {insight}")
+                    output.append(f"  - {insight}")
             output.append("")
 
         # Schema Details
         schemas = result.get("schemas", {})
         if schemas:
-            output.append("📁 SCHEMA DETAILS")
-            output.append("-" * 30)
+            output.append("SCHEMA DETAILS")
             for schema_name, schema_info in schemas.items():
-                output.append(f"\n📂 {schema_name}:")
+                output.append(f"\n{schema_name}:")
                 output.append(f"  Tables: {schema_info.get('table_count', 0)}")
                 output.append(
                     f"  Size: {self._format_bytes(schema_info.get('total_size_bytes', 0))}"
@@ -1030,7 +1024,7 @@ class DatabaseOverviewTool:
 
                 if schema_info.get("is_sampled"):
                     output.append(
-                        f"  ⚠️  Sampled: {schema_info.get('tables_analyzed', 0)}/{schema_info.get('table_count', 0)} tables analyzed"
+                        f"  Sampled: {schema_info.get('tables_analyzed', 0)}/{schema_info.get('table_count', 0)} tables analyzed"
                     )
 
                 # Show top tables in schema
@@ -1050,17 +1044,16 @@ class DatabaseOverviewTool:
                         output.append("  Top tables:")
                         for table_name, table_info in top_schema_tables:
                             output.append(
-                                f"    • {table_name} - {table_info.get('size_readable', 'N/A')}"
+                                f"    - {table_name} - {table_info.get('size_readable', 'N/A')}"
                             )
 
         # Schema Relationship Mapping
         schema_mapping = result.get("schema_relationship_mapping", {})
         if schema_mapping:
-            output.append("\n🔗 SCHEMA RELATIONSHIP MAPPING")
-            output.append("-" * 40)
+            output.append("\nSCHEMA RELATIONSHIP MAPPING")
 
             if "error" in schema_mapping:
-                output.append(f"❌ Error: {schema_mapping['error']}")
+                output.append(f"Error: {schema_mapping['error']}")
             elif "analysis_text" in schema_mapping:
                 # Add the full schema analysis text
                 output.append(schema_mapping["analysis_text"])
@@ -1069,8 +1062,7 @@ class DatabaseOverviewTool:
         # Execution Metadata
         metadata = result.get("execution_metadata", {})
         if metadata:
-            output.append("📋 EXECUTION METADATA")
-            output.append("-" * 30)
+            output.append("EXECUTION METADATA")
             output.append(self._format_execution_metadata(metadata))
 
         return "\n".join(output)

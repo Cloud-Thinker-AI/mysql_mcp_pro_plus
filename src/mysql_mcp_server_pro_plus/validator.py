@@ -55,7 +55,8 @@ class SecurityValidator:
         query_upper = query.upper()
         for keyword in dangerous_keywords:
             if keyword in query_upper:
-                logger.warning(f"Potentially dangerous SQL keyword detected: {keyword}")
-                # For now, we'll allow but log - in production you might want to restrict
+                error_msg = f"Blocked potentially dangerous SQL operation: {keyword}. This operation is not allowed for security reasons."
+                logger.error(error_msg)
+                raise ValueError(error_msg)
 
         return query
