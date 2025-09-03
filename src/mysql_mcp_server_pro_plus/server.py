@@ -290,12 +290,19 @@ def main():
         logger.info(f"Database: {db_config.host}:{db_config.port}/{db_config.database}")
         logger.info(f"Charset: {db_config.charset}, Collation: {db_config.collation}")
 
-        # Run the FastMCP server
-        mcp.run(
-            transport="streamable-http",
-            port=8084,
-            host="0.0.0.0",
-        )
+        # Check if running in MCP client mode (stdio) or standalone server mode
+        import sys
+
+        if len(sys.argv) > 1 and sys.argv[1] == "--stdio":
+            # Run in stdio mode for MCP clients like Claude Desktop
+            mcp.run(transport="stdio")
+        else:
+            # Run as HTTP server for standalone use
+            mcp.run(
+                transport="streamable-http",
+                port=8084,
+                host="0.0.0.0",
+            )
 
     except Exception as e:
         logger.error(f"Failed to start server: {e}", exc_info=True)
