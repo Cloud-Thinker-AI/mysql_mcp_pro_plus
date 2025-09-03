@@ -813,16 +813,13 @@ class BlockingQueriesAnalyzer:
         return alerts
 
     async def _generate_healthy_recommendations(self) -> List[str]:
-        """Generate recommendations when no blocking is detected."""
+        """Generate compact recommendations when no blocking is detected."""
         return [
-            "✅ No current blocking detected - system is healthy",
-            "🔍 Continue monitoring for lock contention patterns",
-            "📊 Review query performance regularly using performance_schema",
-            "⚙️ Ensure proper indexing on frequently queried tables",
-            "🔒 Monitor innodb_lock_wait_timeout setting",
-            "📈 Check deadlock statistics in performance_schema.global_status",
-            "⏱️ Review timeout settings (innodb_lock_wait_timeout, lock_wait_timeout)",
-            "🧹 Monitor InnoDB buffer pool efficiency",
+            "monitor_lock_patterns",
+            "review_query_performance",
+            "check_indexing",
+            "monitor_timeout_settings",
+            "check_deadlock_stats",
         ]
 
     async def _generate_enhanced_recommendations(
@@ -833,286 +830,176 @@ class BlockingQueriesAnalyzer:
         lock_timeout_suggestions: Dict[str, Any],
         historical_analysis: Dict[str, Any],
     ) -> List[str]:
-        """Generate enhanced recommendations based on comprehensive analysis."""
+        """Generate compact enhanced recommendations for agents."""
         recommendations = []
 
         # Start with basic recommendations
         basic_recs = self._generate_recommendations(blocking_data, summary)
         recommendations.extend(basic_recs)
 
-        # Add session termination recommendations
+        # Add session termination recommendations (compact)
         if session_termination_recs:
-            recommendations.append("\n🎯 SESSION TERMINATION RECOMMENDATIONS:")
             for rec in session_termination_recs[:3]:  # Top 3 recommendations
                 recommendations.append(
-                    f"   • {rec['priority']}: Kill Thread {rec['target_thread_id']} - {rec['reason']}"
+                    f"KILL_THREAD_{rec['target_thread_id']}_{rec['priority']}: {rec['reason'][:50]}..."
                 )
 
-        # Add timeout suggestions
+        # Add timeout suggestions (compact)
         if lock_timeout_suggestions.get("recommendations"):
-            recommendations.append("\n⏱️ TIMEOUT CONFIGURATION SUGGESTIONS:")
             for setting, config in lock_timeout_suggestions["recommendations"].items():
                 recommendations.append(
-                    f"   • {setting}: {config['suggested_value']}s - {config['reason']}"
+                    f"TIMEOUT_{setting.upper()}: {config['suggested_value']}s"
                 )
 
-        # Add historical analysis insights
+        # Add historical analysis insights (compact)
         if historical_analysis.get("analysis", {}).get("potential_blocking_sources"):
-            recommendations.append("\n📊 HISTORICAL ANALYSIS:")
-            recommendations.append(
-                f"   • {len(historical_analysis['analysis']['potential_blocking_sources'])} long-running sessions detected"
-            )
+            count = len(historical_analysis["analysis"]["potential_blocking_sources"])
+            recommendations.append(f"HISTORICAL_LONG_RUNNING: {count}_sessions")
 
         return recommendations
 
     def _generate_recommendations(
         self, blocking_data: List[Dict[str, Any]], summary: Dict[str, Any]
     ) -> List[str]:
-        """Generate recommendations based on blocking query analysis."""
+        """Generate compact recommendations for agent consumption."""
         recommendations = []
 
         if summary["max_wait_time_seconds"] > 300:  # 5 minutes
             recommendations.append(
-                f"🚨 CRITICAL: Queries have been blocked for {summary['max_wait_time_seconds']:.1f} seconds. "
-                "Consider terminating long-running blocking queries."
+                f"CRITICAL_BLOCKING: {summary['max_wait_time_seconds']:.1f}s_max_wait_terminate_sessions"
             )
         elif summary["max_wait_time_seconds"] > 60:  # 1 minute
             recommendations.append(
-                f"⚠️ WARNING: Queries blocked for {summary['max_wait_time_seconds']:.1f} seconds. Monitor closely and consider intervention."
+                f"WARNING_BLOCKING: {summary['max_wait_time_seconds']:.1f}s_max_wait_monitor"
             )
 
         if summary["total_blocked"] > 10:
             recommendations.append(
-                f"🚨 HIGH CONTENTION: {summary['total_blocked']} queries are blocked. "
-                "This indicates high lock contention - review query patterns and indexing."
+                f"HIGH_CONTENTION: {summary['total_blocked']}_blocked_queries_review_patterns"
             )
 
-        # Analyze lock types
+        # Analyze lock types (compact)
         lock_types = {}
         for block in blocking_data:
             blocked_lock_type = block["lock_info"]["blocked_lock_type"]
             if blocked_lock_type:
-                lock_types[blocked_lock_type] = lock_types.get(blocked_lock_type, 0) + 1  # type: ignore
+                lock_types[blocked_lock_type] = lock_types.get(blocked_lock_type, 0) + 1
 
-        if "RECORD" in lock_types and lock_types["RECORD"] > 3:  # type: ignore
+        if "RECORD" in lock_types and lock_types["RECORD"] > 3:
             recommendations.append(
-                "💡 OPTIMIZATION: Multiple row-level locks detected. "
-                "Consider optimizing queries to reduce row lock duration."
+                f"ROW_LOCKS_HIGH: {lock_types['RECORD']}_record_locks_optimize_queries"
             )
 
         if "TABLE" in lock_types:
-            recommendations.append(
-                "💡 OPTIMIZATION: Table-level locks detected. Review queries for table scans and consider adding appropriate indexes."
-            )
+            recommendations.append("TABLE_LOCKS_DETECTED: review_scans_add_indexes")
 
-        # Check for same relations being blocked multiple times
+        # Check for hotspots (compact)
         if len(summary["affected_relations"]) < summary["total_blocked"] / 2:
-            recommendations.append(
-                "🎯 HOTSPOT: Multiple queries are contending for the same tables. "
-                "Focus optimization efforts on these hot tables: "
-                + ", ".join(summary["affected_relations"])
-            )
+            relations = ",".join(summary["affected_relations"])
+            recommendations.append(f"LOCK_HOTSPOT: focus_tables_{relations}")
 
         if not recommendations:
-            recommendations.append(
-                "✅ Current blocking situation appears manageable. Monitor for patterns and trends."
-            )
+            recommendations.append("BLOCKING_MANAGEABLE: monitor_patterns")
 
         return recommendations
 
     def _format_as_text(self, result: Dict[str, Any]) -> str:
-        """Format blocking queries analysis result as human-readable text."""
-        output = []
-
-        # Header
-        output.append("🔒 MYSQL BLOCKING QUERIES ANALYSIS")
-        output.append("=" * 50)
+        """Format blocking queries analysis result as token-efficient text for agents."""
+        # Return structured JSON-like output for agent consumption
+        output_lines = []
 
         status = result.get("status", "unknown")
         summary = result.get("summary", {})
         blocking_queries = result.get("blocking_queries", [])
-        recommendations = result.get("recommendations", [])
 
-        # Status and Summary
+        # Compact status summary
+        output_lines.append(f"STATUS: {status}")
+
         if status == "healthy":
-            output.append("✅ STATUS: HEALTHY")
-            output.append(result.get("message", "No blocking queries detected"))
-            output.append("")
-        else:
-            output.append("⚠️ STATUS: BLOCKING DETECTED")
-            output.append("")
+            output_lines.append(
+                f"MESSAGE: {result.get('message', 'No blocking detected')}"
+            )
+            output_lines.append(
+                f"EXEC_TIME: {result.get('execution_metadata', {}).get('execution_time_seconds', 0):.2f}s"
+            )
+            return "\n".join(output_lines)
 
-            # Summary statistics
-            output.append("📊 SUMMARY")
-            output.append("-" * 30)
-            output.append(f"Total Blocked Queries: {summary.get('total_blocked', 0)}")
-            output.append(f"Total Blocking Queries: {summary.get('total_blocking', 0)}")
-            output.append(
-                f"Max Wait Time: {summary.get('max_wait_time_seconds', 0):.1f} seconds"
+        # Summary metrics
+        output_lines.append("SUMMARY:")
+        output_lines.append(f"  blocked: {summary.get('total_blocked', 0)}")
+        output_lines.append(f"  blocking: {summary.get('total_blocking', 0)}")
+        output_lines.append(
+            f"  max_wait: {summary.get('max_wait_time_seconds', 0):.1f}s"
+        )
+        if summary.get("affected_relations"):
+            output_lines.append(
+                f"  relations: {','.join(summary.get('affected_relations', []))}"
             )
 
-            affected_relations = summary.get("affected_relations", [])
-            if affected_relations:
-                output.append(f"Affected Relations: {', '.join(affected_relations)}")
-
-            analysis_timestamp = summary.get("analysis_timestamp", "")
-            if analysis_timestamp:
-                output.append(f"Analysis Time: {analysis_timestamp}")
-
-            output.append("")
-
-        # Blocking queries details
+        # Blocking queries in compact format
         if blocking_queries:
-            output.append("🚫 BLOCKING QUERIES DETAILS")
-            output.append("-" * 40)
+            output_lines.append("BLOCKING:")
+            for block in blocking_queries:
+                blocked = block.get("blocked_process", {})
+                blocking = block.get("blocking_process", {})
+                lock = block.get("lock_info", {})
 
-            for i, block in enumerate(blocking_queries, 1):
-                blocked_proc = block.get("blocked_process", {})
-                blocking_proc = block.get("blocking_process", {})
-                lock_info = block.get("lock_info", {})
+                # Single line per blocking relationship
+                blocked_info = f"tid:{blocked.get('thread_id')} user:{blocked.get('user')} db:{blocked.get('database')} wait:{blocked.get('duration_seconds', 0):.1f}s"
+                blocking_info = f"tid:{blocking.get('thread_id')} user:{blocking.get('user')} db:{blocking.get('database')} dur:{blocking.get('duration_seconds', 0):.1f}s"
+                lock_info = f"type:{lock.get('blocked_lock_type')} mode:{lock.get('blocked_lock_mode')}"
 
-                output.append(f"\n{i}. BLOCKED QUERY:")
-                output.append(f"   Thread ID: {blocked_proc.get('thread_id', 'N/A')}")
-                output.append(f"   User: {blocked_proc.get('user', 'N/A')}")
-                output.append(f"   Host: {blocked_proc.get('host', 'N/A')}")
-                output.append(f"   Database: {blocked_proc.get('database', 'N/A')}")
-                output.append(f"   Command: {blocked_proc.get('command', 'N/A')}")
-                output.append(f"   State: {blocked_proc.get('state', 'N/A')}")
-                output.append(
-                    f"   Wait Duration: {blocked_proc.get('duration_seconds', 0):.1f} seconds"
+                output_lines.append(
+                    f"  {blocked_info} <- {blocking_info} [{lock_info}]"
                 )
 
-                # Query (truncated for readability)
-                query = blocked_proc.get("query", "")
-                if query:
-                    query_truncated = query[:100] + "..." if len(query) > 100 else query
-                    output.append(f"   Query: {query_truncated}")
-
-                # Blocking process
-                if blocking_proc.get("thread_id"):
-                    output.append("\n   BLOCKING PROCESS:")
-                    output.append(
-                        f"   └─ Thread ID: {blocking_proc.get('thread_id', 'N/A')}"
+                # Add query info if available (truncated to 50 chars for efficiency)
+                if blocked.get("query"):
+                    query = (
+                        blocked["query"][:50] + "..."
+                        if len(blocked["query"]) > 50
+                        else blocked["query"]
                     )
-                    output.append(f"   └─ User: {blocking_proc.get('user', 'N/A')}")
-                    output.append(f"   └─ Host: {blocking_proc.get('host', 'N/A')}")
-                    output.append(
-                        f"   └─ Database: {blocking_proc.get('database', 'N/A')}"
+                    output_lines.append(f"    blocked_query: {query}")
+                if blocking.get("query"):
+                    query = (
+                        blocking["query"][:50] + "..."
+                        if len(blocking["query"]) > 50
+                        else blocking["query"]
                     )
-                    output.append(f"   └─ State: {blocking_proc.get('state', 'N/A')}")
-                    output.append(
-                        f"   └─ Duration: {blocking_proc.get('duration_seconds', 0):.1f} seconds"
-                    )
+                    output_lines.append(f"    blocking_query: {query}")
 
-                    # Blocking query (truncated)
-                    blocking_query = blocking_proc.get("query", "")
-                    if blocking_query:
-                        blocking_query_truncated = (
-                            blocking_query[:100] + "..."
-                            if len(blocking_query) > 100
-                            else blocking_query
-                        )
-                        output.append(f"   └─ Query: {blocking_query_truncated}")
-
-                # Lock information
-                if lock_info:
-                    output.append("\n   LOCK INFORMATION:")
-                    if lock_info.get("blocked_lock_type"):
-                        output.append(
-                            f"   └─ Blocked Lock Type: {lock_info.get('blocked_lock_type', 'N/A')}"
-                        )
-                    if lock_info.get("blocked_lock_mode"):
-                        output.append(
-                            f"   └─ Blocked Lock Mode: {lock_info.get('blocked_lock_mode', 'N/A')}"
-                        )
-                    if lock_info.get("blocking_lock_type"):
-                        output.append(
-                            f"   └─ Blocking Lock Type: {lock_info.get('blocking_lock_type', 'N/A')}"
-                        )
-                    if lock_info.get("blocking_lock_mode"):
-                        output.append(
-                            f"   └─ Blocking Lock Mode: {lock_info.get('blocking_lock_mode', 'N/A')}"
-                        )
-                    if lock_info.get("affected_objects"):
-                        output.append(
-                            f"   └─ Affected Objects: {lock_info.get('affected_objects', 'N/A')}"
-                        )
-
-                output.append("")
-
-        # Recommendations
+        # Priority recommendations only
+        recommendations = result.get("recommendations", [])
         if recommendations:
-            output.append("💡 RECOMMENDATIONS")
-            output.append("-" * 30)
-            for i, rec in enumerate(recommendations, 1):
-                output.append(f"{i}. {rec}")
-            output.append("")
-
-        # Additional analysis sections for healthy status
-        if status == "healthy":
-            output.append("📋 SYSTEM STATUS")
-            output.append("-" * 30)
-            output.append("• No blocking queries detected")
-            output.append("• All queries are running without lock contention")
-            output.append("• Database locking system is operating normally")
-            output.append("")
-
-            output.append("🔍 MONITORING SUGGESTIONS")
-            output.append("-" * 30)
-            output.append("• Continue monitoring for lock contention patterns")
-            output.append("• Review query performance regularly")
-            output.append("• Monitor InnoDB lock wait timeout settings")
-            output.append("• Check for deadlocks in MySQL error log")
+            output_lines.append("PRIORITY_ACTIONS:")
+            for rec in recommendations[:5]:  # Limit to top 5 for efficiency
+                # Extract priority indicators
+                if "CRITICAL" in rec or "HIGH" in rec:
+                    output_lines.append(f"  {rec.replace(chr(10), ' ')}")
 
         # Execution metadata
-        execution_metadata = result.get("execution_metadata", {})
-        if execution_metadata:
-            output.append("")
-            output.append("⏱️ EXECUTION METADATA")
-            output.append("-" * 30)
-            output.append(
-                f"Execution Time: {execution_metadata.get('execution_time_seconds', 0):.2f} seconds"
-            )
-            output.append(f"Timestamp: {execution_metadata.get('timestamp', 'N/A')}")
+        exec_meta = result.get("execution_metadata", {})
+        output_lines.append(
+            f"EXEC_TIME: {exec_meta.get('execution_time_seconds', 0):.2f}s"
+        )
+        output_lines.append(f"TIMESTAMP: {exec_meta.get('timestamp', 'N/A')}")
 
-        return "\n".join(output)
+        return "\n".join(output_lines)
 
     def _format_timeout_result(self, timeout: int) -> str:
-        """Format timeout error result."""
-        return f"""🔒 MYSQL BLOCKING QUERIES ANALYSIS
-{"=" * 50}
-
-⚠️ TIMEOUT ERROR
-
-The blocking queries analysis timed out after {timeout} seconds.
-This may indicate:
-• High system load affecting query performance
-• Large number of active connections
-• Complex blocking relationships requiring more time to analyze
-
-💡 RECOMMENDATIONS:
-1. Try running the analysis again during off-peak hours
-2. Consider increasing the timeout value
-3. Check system resources and current database load
-4. Review current active connections and long-running queries
-"""
+        """Format timeout error result for agents."""
+        return f"""STATUS: timeout
+TIMEOUT_SECONDS: {timeout}
+CAUSE: high_load|complex_analysis|resource_constraints
+RECOMMENDATIONS: retry_offpeak|increase_timeout|check_resources|review_connections"""
 
     def _format_error_result(self, error: str) -> str:
-        """Format general error result."""
-        return f"""🔒 MYSQL BLOCKING QUERIES ANALYSIS
-{"=" * 50}
-
-❌ ERROR
-
-An error occurred during blocking queries analysis:
-{error}
-
-💡 TROUBLESHOOTING:
-1. Verify database connection is active
-2. Check if performance_schema is enabled
-3. Ensure user has necessary privileges for performance_schema tables
-4. Review MySQL error log for additional details
-"""
+        """Format general error result for agents."""
+        error_clean = error.replace("\n", " | ")
+        return f"""STATUS: error
+ERROR: {error_clean}
+TROUBLESHOOTING: check_connection|verify_performance_schema|check_privileges|review_error_log"""
 
 
 # Create the tool function that will be exposed to the MCP server

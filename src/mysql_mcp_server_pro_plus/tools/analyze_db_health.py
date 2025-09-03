@@ -11,6 +11,14 @@ import time
 from datetime import datetime
 from typing import Any, Dict
 
+try:
+    import psutil
+
+    HAS_PSUTIL = True
+except ImportError:
+    psutil = None
+    HAS_PSUTIL = False
+
 from ..logger import logger
 
 
@@ -449,11 +457,11 @@ class DatabaseHealthAnalyzer:
 
     async def _analyze_buffer_pool(self) -> Dict[str, Any]:
         """Analyze InnoDB buffer pool efficiency."""
-        buffer_pool_data = {
+        buffer_pool_data: Dict[str, Any] = {
             "status": "healthy",
             "buffer_pool_size": 0,
-            "buffer_pool_usage_percent": 0,
-            "hit_ratio": 0,
+            "buffer_pool_usage_percent": 0.0,
+            "hit_ratio": 0.0,
             "pages_data": 0,
             "pages_free": 0,
             "pages_dirty": 0,
@@ -579,21 +587,20 @@ class DatabaseHealthAnalyzer:
                 )
 
             # Check if buffer pool is too small for system memory
-            try:
-                import psutil
-
-                total_memory = psutil.virtual_memory().total
-                bp_size = buffer_pool_data["buffer_pool_size"]
-                if bp_size > 0 and bp_size < (total_memory * 0.7):
-                    buffer_pool_data["issues"].append(
-                        "💡 Buffer pool might be undersized"
-                    )
-                    buffer_pool_data["recommendations"].append(
-                        f"Consider increasing buffer pool size (currently {bp_size // (1024**3)}GB, "
-                        f"system has {total_memory // (1024**3)}GB)"
-                    )
-            except ImportError:
-                pass  # psutil not available
+            if HAS_PSUTIL and psutil is not None:
+                try:
+                    total_memory = psutil.virtual_memory().total
+                    bp_size = int(buffer_pool_data["buffer_pool_size"])
+                    if bp_size > 0 and bp_size < (total_memory * 0.7):
+                        buffer_pool_data["issues"].append(
+                            "💡 Buffer pool might be undersized"
+                        )
+                        buffer_pool_data["recommendations"].append(
+                            f"Consider increasing buffer pool size (currently {bp_size // (1024**3)}GB, "
+                            f"system has {total_memory // (1024**3)}GB)"
+                        )
+                except Exception as e:
+                    logger.debug(f"Error checking system memory: {e}")
 
         except Exception as e:
             logger.error(f"Error analyzing buffer pool: {e}")
@@ -604,7 +611,7 @@ class DatabaseHealthAnalyzer:
 
     async def _analyze_replication(self) -> Dict[str, Any]:
         """Analyze replication status and health."""
-        replication_data = {
+        replication_data: Dict[str, Any] = {
             "status": "healthy",
             "is_slave": False,
             "is_master": False,
@@ -730,7 +737,7 @@ class DatabaseHealthAnalyzer:
 
     async def _analyze_constraints(self) -> Dict[str, Any]:
         """Analyze constraint integrity and foreign key health."""
-        constraints_data = {
+        constraints_data: Dict[str, Any] = {
             "status": "healthy",
             "foreign_keys": [],
             "check_constraints": [],
@@ -811,7 +818,6 @@ class DatabaseHealthAnalyzer:
                 )
 
             # Check for potential orphaned records (sample check)
-            orphan_checks = []
             for fk in constraints_data["foreign_keys"][
                 :5
             ]:  # Limit to first 5 for performance
@@ -870,7 +876,7 @@ class DatabaseHealthAnalyzer:
 
     async def _analyze_auto_increment(self) -> Dict[str, Any]:
         """Analyze auto-increment sequences and potential exhaustion."""
-        auto_increment_data = {
+        auto_increment_data: Dict[str, Any] = {
             "status": "healthy",
             "sequences": [],
             "near_exhaustion": [],
@@ -996,10 +1002,10 @@ class DatabaseHealthAnalyzer:
 
     async def _analyze_fragmentation(self) -> Dict[str, Any]:
         """Analyze table fragmentation and optimization needs."""
-        fragmentation_data = {
+        fragmentation_data: Dict[str, Any] = {
             "status": "healthy",
             "fragmented_tables": [],
-            "total_fragmentation_mb": 0,
+            "total_fragmentation_mb": 0.0,
             "optimization_candidates": [],
             "issues": [],
             "recommendations": [],
@@ -1123,7 +1129,7 @@ class DatabaseHealthAnalyzer:
 
     async def _analyze_performance_metrics(self) -> Dict[str, Any]:
         """Analyze key performance metrics."""
-        performance_data = {
+        performance_data: Dict[str, Any] = {
             "status": "healthy",
             "query_cache": {},
             "slow_queries": {},
@@ -1286,7 +1292,7 @@ class DatabaseHealthAnalyzer:
 
     async def _analyze_storage_engines(self) -> Dict[str, Any]:
         """Analyze storage engine usage and health."""
-        storage_data = {
+        storage_data: Dict[str, Any] = {
             "status": "healthy",
             "engines": {},
             "table_distribution": {},
@@ -1349,11 +1355,6 @@ class DatabaseHealthAnalyzer:
                 .get("MyISAM", {})
                 .get("table_count", 0)
             )
-            innodb_tables = (
-                storage_data["table_distribution"]
-                .get("InnoDB", {})
-                .get("table_count", 0)
-            )
 
             if myisam_tables > 0 and total_tables > 0:
                 myisam_percent = round((myisam_tables / total_tables) * 100, 2)
@@ -1400,7 +1401,7 @@ class DatabaseHealthAnalyzer:
 
     async def _analyze_security(self) -> Dict[str, Any]:
         """Analyze security-related configuration."""
-        security_data = {
+        security_data: Dict[str, Any] = {
             "status": "healthy",
             "user_accounts": [],
             "privileges": {},

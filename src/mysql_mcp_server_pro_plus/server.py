@@ -1,19 +1,23 @@
+from typing import Any, Dict, List, Optional
+
 from fastmcp import FastMCP
 
 from .config import DatabaseConfig
 from .db_manager import DatabaseManager
-from .validator import SecurityValidator
-from .tools import (
-    execute_sql_tool,
-    list_tables_tool,
-    describe_table_tool,
-    get_database_overview_tool,
-    get_blocking_queries_tool,
-    analyze_db_health_tool,
-)
-
 from .logger import logger
-
+from .tools import (
+    analyze_db_health_tool,
+    analyze_query_performance_tool,
+    describe_table_tool,
+    discover_sensitive_data_tool,
+    execute_sql_tool,
+    explore_interactive_tool,
+    get_blocking_queries_tool,
+    get_database_overview_tool,
+    get_schema_visualization_tool,
+    list_tables_tool,
+)
+from .validator import SecurityValidator
 
 # Initialize FastMCP server
 mcp = FastMCP("mysql_mcp_server_pro_plus")
@@ -159,6 +163,178 @@ async def analyze_db_health(timeout: int = 300) -> str:
     """
     global _db_manager
     return await analyze_db_health_tool(_db_manager, timeout)
+
+
+@mcp.tool()
+async def analyze_query_performance(
+    query: str, analyze_execution: bool = False, timeout: int = 300
+) -> str:
+    """Analyze query performance with comprehensive metrics and optimization recommendations.
+
+    Enterprise-grade query performance analysis featuring:
+    - EXPLAIN Plan Analysis: Query execution strategy, index usage, table scan types
+    - Performance Metrics: Estimated vs actual execution time, I/O costs, memory usage
+    - Index Recommendations: Missing indexes, unused indexes, composite index suggestions
+    - Query Optimization: Rewrite suggestions, JOIN optimization, WHERE clause improvements
+    - Execution Analysis: Actual runtime statistics (optional, with safety controls)
+    - Cost Estimation: Resource consumption predictions
+
+    Enhanced Features:
+    - Query Plan Visualization: ASCII tree structure of execution steps
+    - Performance Comparison: Before/after optimization suggestions
+    - Resource Usage Tracking: Buffer pool hits, temporary table usage
+    - Lock Analysis: Query lock requirements and potential conflicts
+    - Cardinality Estimation: Accuracy analysis and statistics recommendations
+
+    Args:
+        query: The SQL query to analyze
+        analyze_execution: Enable actual execution analysis (default: False, safer)
+        timeout: Maximum execution time in seconds (default: 300)
+    """
+    global _db_manager, _security_validator
+    return await analyze_query_performance_tool(
+        query, analyze_execution, _db_manager, _security_validator, timeout
+    )
+
+
+@mcp.tool()
+async def get_schema_visualization(
+    schema_name: Optional[str] = None, format: str = "text", timeout: int = 300
+) -> str:
+    """Generate comprehensive schema visualization with ER diagrams and relationship analysis.
+
+    Enterprise-grade schema visualization featuring:
+    - ER Diagram Generation: ASCII/text-based relationship diagrams
+    - Table Dependencies: Foreign key relationships, dependency chains
+    - Relationship Types: One-to-one, one-to-many, many-to-many mappings
+    - Constraint Visualization: Primary keys, unique constraints, check constraints
+    - Circular Reference Detection: Identify potential design issues
+    - Impact Analysis: Show cascading effects of schema changes
+
+    Enhanced Features:
+    - Schema Statistics: Table sizes, row counts, index usage
+    - Data Type Analysis: Column types, nullable patterns, defaults
+    - Index Coverage: Index efficiency across relationships
+    - Normalization Analysis: 1NF, 2NF, 3NF compliance checking
+    - Migration Impact: Dependency order for schema changes
+
+    Args:
+        schema_name: Specific schema to analyze (default: current database)
+        format: Output format - "text", "tree", or "detailed" (default: "text")
+        timeout: Maximum execution time in seconds (default: 300)
+    """
+    global _db_manager, _security_validator
+    return await get_schema_visualization_tool(
+        schema_name, format, _db_manager, _security_validator, timeout
+    )
+
+
+@mcp.tool()
+async def explore_interactive(
+    table_name: str,
+    exploration_type: str = "drilldown",
+    sample_size: int = 1000,
+    filters: Optional[Dict[str, Any]] = None,
+    group_by: Optional[List[str]] = None,
+    order_by: Optional[str] = None,
+    time_column: Optional[str] = None,
+) -> str:
+    """Interactive data exploration with multiple analysis modes.
+
+    Comprehensive exploration tool providing:
+    - Drill-down Exploration: Navigate from summary to detailed views
+    - Pattern Discovery: Automatic detection of data patterns and anomalies
+    - Relationship Exploration: Navigate foreign key relationships interactively
+    - Time-series Analysis: Trend analysis for temporal data
+    - Comparative Analysis: Compare data across different segments
+    - Smart Sampling: Multiple sampling strategies (random, stratified, time-based)
+
+    Args:
+        table_name: Target table to explore
+        exploration_type: Type of exploration ("drilldown", "patterns", "relationships",
+                        "timeseries", "comparative", "sampling")
+        sample_size: Number of records to sample (max 10,000)
+        filters: Optional filters to apply as dict (e.g., {"status": "active"})
+        group_by: Columns to group by for aggregation
+        order_by: Column to order results by
+        time_column: Column containing temporal data for time-series analysis
+
+    Returns:
+        Comprehensive exploration results with insights and recommendations
+    """
+    global _db_manager, _security_validator
+    return await explore_interactive_tool(
+        table_name=table_name,
+        exploration_type=exploration_type,
+        sample_size=sample_size,
+        filters=filters,
+        group_by=group_by,
+        order_by=order_by,
+        time_column=time_column,
+        db_manager=_db_manager,
+        security_validator=_security_validator,
+    )
+
+
+@mcp.tool()
+async def discover_sensitive_data(
+    scan_all: bool = False,
+    table_patterns: Optional[List[str]] = None,
+    custom_patterns: Optional[Dict[str, str]] = None,
+    risk_threshold: int = 50,
+    sample_size: int = 1000,
+) -> str:
+    """Discover sensitive data patterns in MySQL database.
+
+    Enterprise-grade sensitive data discovery for security compliance and data protection analysis.
+
+    Advanced Features:
+    - PII Pattern Detection: Names, emails, phone numbers, addresses, SSN patterns
+    - Financial Data: Credit cards, bank accounts, tax IDs
+    - Medical Data: Health records, medication patterns, patient information
+    - Location Data: GPS coordinates, IP addresses, geographic information
+    - Custom Patterns: Configurable regex patterns for domain-specific sensitive data
+    - Risk Assessment: Multi-dimensional sensitivity scoring and exposure analysis
+    - Compliance Mapping: GDPR, HIPAA, PCI-DSS, CCPA compliance framework alignment
+    - Smart Sampling: Performance-optimized scanning for large datasets
+
+    Security & Performance:
+    - Read-only operations with comprehensive security validation
+    - Intelligent sampling strategies to handle large tables efficiently
+    - Masking of sensitive data in reports to prevent exposure
+    - Detailed audit trail with comprehensive logging
+    - Risk-based filtering to focus on high-priority findings
+
+    Detection Methods:
+    - Column name pattern matching for structural analysis
+    - Content pattern matching using optimized regex engines
+    - Hybrid detection combining multiple techniques
+    - Confidence scoring and false positive reduction
+
+    Args:
+        scan_all: Scan all tables in database (default: False, scans first 10 tables for safety)
+        table_patterns: List of table name patterns to scan (e.g., ["user_", "customer_", "patient_"])
+        custom_patterns: Dict of custom regex patterns {"pattern_name": "regex_pattern"}
+        risk_threshold: Minimum risk score to report (0-100, default: 50)
+        sample_size: Number of rows to sample per table (default: 1000, max recommended: 10000)
+
+    Returns:
+        Comprehensive sensitive data discovery report with:
+        - Executive summary with risk scores and compliance impact
+        - Detailed findings by table and column with sample data
+        - Security recommendations and remediation guidance
+        - Compliance framework mapping and violation summary
+    """
+    global _db_manager, _security_validator
+    return await discover_sensitive_data_tool(
+        scan_all=scan_all,
+        table_patterns=table_patterns,
+        custom_patterns=custom_patterns,
+        risk_threshold=risk_threshold,
+        sample_size=sample_size,
+        db_manager=_db_manager,
+        security_validator=_security_validator,
+    )
 
 
 def main():
