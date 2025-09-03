@@ -67,6 +67,18 @@ check:
 publish: clean build check upload
 	@echo "🎉 Package successfully published to PyPI!"
 
+# Upload to PyPI
+upload:
+	@echo "📤 Uploading to PyPI..."
+	uv run twine upload dist/*
+	@echo "✅ Upload complete"
+
+# Upload to TestPyPI
+upload-test:
+	@echo "📤 Uploading to TestPyPI..."
+	uv run twine upload --repository testpypi dist/*
+	@echo "✅ Upload to TestPyPI complete"
+
 # Full test publish workflow
 publish-test: clean build check upload-test
 	@echo "🎉 Package successfully published to TestPyPI!"
