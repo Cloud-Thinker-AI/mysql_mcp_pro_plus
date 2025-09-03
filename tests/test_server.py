@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from mysql_mcp_server_pro_plus.server import (
     DatabaseManager,
     SecurityValidator,
-    QueryResult,
     DatabaseConfig,
 )
+from mysql_mcp_server_pro_plus.db_manager import QueryResult
 
 
 class TestDatabaseConfig:
