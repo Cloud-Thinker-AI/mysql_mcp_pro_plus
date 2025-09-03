@@ -1,3 +1,5 @@
+# NOTE: This tool is not used in the project and is only kept for reference
+
 import re
 from dataclasses import dataclass
 from enum import Enum

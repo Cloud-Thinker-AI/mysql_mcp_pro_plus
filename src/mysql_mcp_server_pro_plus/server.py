@@ -9,7 +9,6 @@ from .tools import (
     analyze_db_health_tool,
     analyze_query_performance_tool,
     describe_table_tool,
-    discover_sensitive_data_tool,
     execute_sql_tool,
     explore_interactive_tool,
     get_blocking_queries_tool,
@@ -271,67 +270,6 @@ async def explore_interactive(
         group_by=group_by,
         order_by=order_by,
         time_column=time_column,
-        db_manager=_db_manager,
-        security_validator=_security_validator,
-    )
-
-
-@mcp.tool()
-async def discover_sensitive_data(
-    scan_all: bool = False,
-    table_patterns: Optional[List[str]] = None,
-    custom_patterns: Optional[Dict[str, str]] = None,
-    risk_threshold: int = 50,
-    sample_size: int = 1000,
-) -> str:
-    """Discover sensitive data patterns in MySQL database.
-
-    Enterprise-grade sensitive data discovery for security compliance and data protection analysis.
-
-    Advanced Features:
-    - PII Pattern Detection: Names, emails, phone numbers, addresses, SSN patterns
-    - Financial Data: Credit cards, bank accounts, tax IDs
-    - Medical Data: Health records, medication patterns, patient information
-    - Location Data: GPS coordinates, IP addresses, geographic information
-    - Custom Patterns: Configurable regex patterns for domain-specific sensitive data
-    - Risk Assessment: Multi-dimensional sensitivity scoring and exposure analysis
-    - Compliance Mapping: GDPR, HIPAA, PCI-DSS, CCPA compliance framework alignment
-    - Smart Sampling: Performance-optimized scanning for large datasets
-
-    Security & Performance:
-    - Read-only operations with comprehensive security validation
-    - Intelligent sampling strategies to handle large tables efficiently
-    - Masking of sensitive data in reports to prevent exposure
-    - Detailed audit trail with comprehensive logging
-    - Risk-based filtering to focus on high-priority findings
-
-    Detection Methods:
-    - Column name pattern matching for structural analysis
-    - Content pattern matching using optimized regex engines
-    - Hybrid detection combining multiple techniques
-    - Confidence scoring and false positive reduction
-
-    Args:
-        scan_all: Scan all tables in database (default: False, scans first 10 tables for safety)
-        table_patterns: List of table name patterns to scan (e.g., ["user_", "customer_", "patient_"])
-        custom_patterns: Dict of custom regex patterns {"pattern_name": "regex_pattern"}
-        risk_threshold: Minimum risk score to report (0-100, default: 50)
-        sample_size: Number of rows to sample per table (default: 1000, max recommended: 10000)
-
-    Returns:
-        Comprehensive sensitive data discovery report with:
-        - Executive summary with risk scores and compliance impact
-        - Detailed findings by table and column with sample data
-        - Security recommendations and remediation guidance
-        - Compliance framework mapping and violation summary
-    """
-    global _db_manager, _security_validator
-    return await discover_sensitive_data_tool(
-        scan_all=scan_all,
-        table_patterns=table_patterns,
-        custom_patterns=custom_patterns,
-        risk_threshold=risk_threshold,
-        sample_size=sample_size,
         db_manager=_db_manager,
         security_validator=_security_validator,
     )

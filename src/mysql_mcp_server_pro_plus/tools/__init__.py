@@ -1,7 +1,6 @@
 from .analyze_db_health import analyze_db_health_tool
 from .analyze_query_performance import analyze_query_performance_tool
 from .describe_table import describe_table_tool
-from .discover_sensitive_data import discover_sensitive_data_tool
 from .execute_sql import execute_sql_tool
 from .explore_interactive import explore_interactive_tool
 from .get_blocking_queries import get_blocking_queries_tool
@@ -19,5 +18,4 @@ __all__ = [
     "analyze_query_performance_tool",
     "get_schema_visualization_tool",
     "explore_interactive_tool",
-    "discover_sensitive_data_tool",
 ]
